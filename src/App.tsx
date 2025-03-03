@@ -9,6 +9,7 @@ import VulnerabilityScanner from './pages/VulnerabilityScanner';
 import NetworkScanner from './pages/NetworkScanner';
 import Reports from './pages/Reports';
 import Login from './pages/Login';
+import Profile from './components/Profile';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -102,6 +103,7 @@ function App() {
                         <Route path="/vulnerability-scanner" element={<VulnerabilityScanner />} />
                         <Route path="/network-scanner" element={<NetworkScanner />} />
                         <Route path="/reports" element={<Reports />} />
+                        <Route path="/profile" element={<Profile />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>
                     </Box>

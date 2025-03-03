@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -20,14 +21,17 @@ import {
 import {
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
-  AccountCircle,
+  Person as PersonIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
   History as HistoryIcon,
   Speed as PerformanceIcon,
   Tune as ConfigIcon,
   CloudUpload as UpdateIcon,
+  AccountCircle as AccountIcon,
+  ExitToApp as LogoutIcon,
 } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NavbarProps {
   darkMode: boolean;
@@ -60,6 +64,8 @@ const mockAlertHistory: AlertHistoryItem[] = [
 ];
 
 export default function Navbar({ darkMode, onThemeChange }: NavbarProps) {
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationDrawer, setNotificationDrawer] = useState(false);
   const [settingsDrawer, setSettingsDrawer] = useState(false);
@@ -73,6 +79,26 @@ export default function Navbar({ darkMode, onThemeChange }: NavbarProps) {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleProfile = () => {
+    handleMenuClose();
+    navigate('/profile');
+  };
+
+  const handleMyAccount = () => {
+    handleMenuClose();
+    navigate('/profile');  // You can create a separate account page if needed
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      handleMenuClose();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   const getSeverityColor = (severity: string) => {
@@ -114,10 +140,19 @@ export default function Navbar({ darkMode, onThemeChange }: NavbarProps) {
 
           <IconButton
             edge="end"
-            color="inherit"
             onClick={handleProfileMenuOpen}
+            sx={{ ml: 1 }}
           >
-            <AccountCircle />
+            <Avatar
+              sx={{
+                width: 32,
+                height: 32,
+                bgcolor: 'primary.main',
+                fontSize: '1rem',
+              }}
+            >
+              {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+            </Avatar>
           </IconButton>
         </Toolbar>
       </AppBar>
@@ -127,10 +162,42 @@ export default function Navbar({ darkMode, onThemeChange }: NavbarProps) {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+            mt: 1.5,
+            '& .MuiAvatar-root': {
+              width: 32,
+              height: 32,
+              ml: -0.5,
+              mr: 1,
+            },
+          },
+        }}
       >
-        <MenuItem onClick={handleMenuClose}>Profile</MenuItem>
-        <MenuItem onClick={handleMenuClose}>My Account</MenuItem>
-        <MenuItem onClick={handleMenuClose}>Logout</MenuItem>
+        <MenuItem onClick={handleProfile}>
+          <ListItemIcon>
+            <PersonIcon fontSize="small" />
+          </ListItemIcon>
+          Profile
+        </MenuItem>
+        <MenuItem onClick={handleMyAccount}>
+          <ListItemIcon>
+            <AccountIcon fontSize="small" />
+          </ListItemIcon>
+          My Account
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleLogout}>
+          <ListItemIcon>
+            <LogoutIcon fontSize="small" />
+          </ListItemIcon>
+          Logout
+        </MenuItem>
       </Menu>
 
       {/* Notification History Drawer */}

@@ -4,8 +4,11 @@ import { CircularProgress, Box } from '@mui/material';
 interface User {
   id: string;
   email: string;
+  name?: string;
   companyName?: string;
   phoneNumber?: string;
+  region?: string;
+  position?: string;
   isAdmin: boolean;
 }
 
@@ -16,6 +19,7 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string, isAdmin?: boolean) => Promise<void>;
   register: (userData: Partial<User> & { password: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfile: (userData: Partial<User>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,12 +28,22 @@ const DEFAULT_ADMIN = {
   email: 'admin@company.com',
   password: 'admin@123',
   isAdmin: true,
+  name: 'Admin User',
+  companyName: 'Tech Corp',
+  phoneNumber: '+1 234 567 8900',
+  region: 'North America',
+  position: 'System Administrator',
 };
 
 const DEFAULT_USER = {
   email: 'user@company.com',
   password: 'user@123',
   isAdmin: false,
+  name: 'Regular User',
+  companyName: 'Tech Corp',
+  phoneNumber: '+1 234 567 8901',
+  region: 'North America',
+  position: 'Security Analyst',
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -60,6 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const mockUser: User = {
         id: '1',
         email: 'google@example.com',
+        name: 'Google User',
+        companyName: 'Tech Corp',
+        phoneNumber: '+1 234 567 8902',
+        region: 'North America',
+        position: 'Security Analyst',
         isAdmin: false
       };
       setUser(mockUser);
@@ -81,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: isAdmin ? 'admin-1' : 'user-1',
           email,
           isAdmin,
+          ...(isAdmin ? DEFAULT_ADMIN : DEFAULT_USER),
         };
         setUser(mockUser);
         localStorage.setItem('user', JSON.stringify(mockUser));
@@ -98,8 +118,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const mockUser: User = {
         id: '3',
         email: userData.email!,
+        name: userData.name,
         companyName: userData.companyName,
         phoneNumber: userData.phoneNumber,
+        region: userData.region,
+        position: userData.position,
         isAdmin: false // New registrations are always regular users
       };
       setUser(mockUser);
@@ -120,13 +143,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfile = async (userData: Partial<User>) => {
+    try {
+      if (!user) throw new Error('No user logged in');
+      
+      const updatedUser = {
+        ...user,
+        ...userData,
+      };
+      
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    } catch (error) {
+      console.error('Profile update failed:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     loading,
     signInWithGoogle,
     signInWithEmail,
     register,
-    signOut
+    signOut,
+    updateProfile
   };
 
   return (
