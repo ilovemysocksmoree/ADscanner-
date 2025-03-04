@@ -22,7 +22,7 @@ interface AuthContextType {
   updateProfile: (userData: Partial<User>) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const DEFAULT_ADMIN = {
   email: 'admin@company.com',
@@ -47,7 +47,10 @@ const DEFAULT_USER = {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -158,6 +161,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Profile update failed:', error);
       throw error;
     }
+  };
+
+  const login = async (email: string, password: string) => {
+    const savedUsers = localStorage.getItem('domainUsers');
+    const users = savedUsers ? JSON.parse(savedUsers) : [];
+    const foundUser = users.find((u: any) => u.email === email);
+
+    if (!foundUser) {
+      throw new Error('Invalid email or password');
+    }
+
+    if (foundUser.password !== password) {
+      throw new Error('Invalid email or password');
+    }
+
+    if (foundUser.status === 'pending') {
+      throw new Error('Please confirm your account through the email link first');
+    }
+
+    if (foundUser.status === 'inactive') {
+      throw new Error('Your account has been deactivated. Please contact an administrator');
+    }
+
+    // Update last login
+    const updatedUsers = users.map((u: any) =>
+      u.email === email ? { ...u, lastLogin: new Date().toISOString() } : u
+    );
+    localStorage.setItem('domainUsers', JSON.stringify(updatedUsers));
+
+    const userToSave = {
+      id: foundUser.id,
+      email: foundUser.email,
+      name: foundUser.name,
+      role: foundUser.role,
+      isAdmin: foundUser.role === 'admin',
+      groupId: foundUser.groupId,
+    };
+
+    setUser(userToSave);
+    localStorage.setItem('currentUser', JSON.stringify(userToSave));
   };
 
   const value = {

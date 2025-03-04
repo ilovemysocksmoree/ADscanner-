@@ -22,6 +22,7 @@ import {
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { loggingService } from '../../services/LoggingService';
+import { EmailService } from '../../services/EmailService';
 
 interface DomainGroup {
   id: string;
@@ -53,37 +54,6 @@ const generatePassword = () => {
     password += charset.charAt(Math.floor(Math.random() * charset.length));
   }
   return password;
-};
-
-const sendConfirmationEmail = async (email: string, password: string, name: string) => {
-  // In a real application, this would use a proper email service
-  // For demonstration, we'll log the email content
-  const emailContent = `
-    Dear ${name},
-
-    An administrator has created an account for you. Please use the following credentials to log in:
-
-    Email: ${email}
-    Password: ${password}
-
-    Please click the following link to confirm your account:
-    http://yourdomain.com/confirm-account?email=${encodeURIComponent(email)}
-
-    This is a temporary password. You will be prompted to change it upon your first login.
-
-    Best regards,
-    Your Application Team
-  `;
-
-  console.log('Confirmation email content:', emailContent);
-  
-  // In a real application, you would use an email service like SendGrid:
-  // await sendGrid.send({
-  //   to: email,
-  //   from: 'your-app@domain.com',
-  //   subject: 'Confirm Your Account',
-  //   text: emailContent,
-  // });
 };
 
 export default function AddDomainUser() {
@@ -212,15 +182,22 @@ export default function AddDomainUser() {
         
         localStorage.setItem('domainUsers', JSON.stringify([...users, newUser]));
         
-        // Send confirmation email
+        // Send confirmation email using EmailService
         try {
-          await sendConfirmationEmail(formData.email, formData.password, formData.name);
+          await EmailService.sendConfirmationEmail(
+            formData.email,
+            formData.password,
+            formData.name
+          );
+          
           loggingService.addLog(
             user,
             'CREATE_USER',
             `Created new user: ${formData.email} and sent confirmation email`,
             '/admin/add-domain-user'
           );
+          
+          setSuccess('User created successfully and confirmation email sent');
         } catch (error) {
           console.error('Failed to send confirmation email:', error);
           loggingService.addLog(
@@ -229,9 +206,9 @@ export default function AddDomainUser() {
             `Failed to send confirmation email to: ${formData.email}`,
             '/admin/add-domain-user'
           );
+          
+          setError('User created but failed to send confirmation email. Please try sending it again.');
         }
-        
-        setSuccess('User created successfully and confirmation email sent');
       }
 
       // Update group user count
