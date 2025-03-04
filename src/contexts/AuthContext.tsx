@@ -10,6 +10,8 @@ interface User {
   region?: string;
   position?: string;
   isAdmin: boolean;
+  role?: string;
+  groupId?: string;
 }
 
 interface AuthContextType {
@@ -20,6 +22,7 @@ interface AuthContextType {
   register: (userData: Partial<User> & { password: string }) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (userData: Partial<User>) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -57,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check if user is logged in
     const checkAuth = async () => {
       try {
-        const savedUser = localStorage.getItem('user');
+        const savedUser = localStorage.getItem('currentUser');
         if (savedUser) {
           setUser(JSON.parse(savedUser));
         }
@@ -85,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin: false
       };
       setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      localStorage.setItem('currentUser', JSON.stringify(mockUser));
     } catch (error) {
       console.error('Google sign in failed:', error);
       throw error;
@@ -106,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...(isAdmin ? DEFAULT_ADMIN : DEFAULT_USER),
         };
         setUser(mockUser);
-        localStorage.setItem('user', JSON.stringify(mockUser));
+        localStorage.setItem('currentUser', JSON.stringify(mockUser));
       } else {
         throw new Error('Invalid credentials');
       }
@@ -129,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin: false // New registrations are always regular users
       };
       setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      localStorage.setItem('currentUser', JSON.stringify(mockUser));
     } catch (error) {
       console.error('Registration failed:', error);
       throw error;
@@ -139,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       setUser(null);
-      localStorage.removeItem('user');
+      localStorage.removeItem('currentUser');
     } catch (error) {
       console.error('Sign out failed:', error);
       throw error;
@@ -156,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
     } catch (error) {
       console.error('Profile update failed:', error);
       throw error;
@@ -164,43 +167,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    const savedUsers = localStorage.getItem('domainUsers');
-    const users = savedUsers ? JSON.parse(savedUsers) : [];
-    const foundUser = users.find((u: any) => u.email === email);
+    try {
+      const savedUsers = localStorage.getItem('domainUsers');
+      const users = savedUsers ? JSON.parse(savedUsers) : [];
+      const foundUser = users.find((u: any) => u.email === email);
 
-    if (!foundUser) {
-      throw new Error('Invalid email or password');
+      if (!foundUser) {
+        throw new Error('Invalid email or password');
+      }
+
+      if (foundUser.password !== password) {
+        throw new Error('Invalid email or password');
+      }
+
+      if (foundUser.status === 'pending') {
+        throw new Error('Please confirm your account through the email link first');
+      }
+
+      if (foundUser.status === 'inactive') {
+        throw new Error('Your account has been deactivated. Please contact an administrator');
+      }
+
+      // Update last login
+      const updatedUsers = users.map((u: any) =>
+        u.email === email ? { ...u, lastLogin: new Date().toISOString() } : u
+      );
+      localStorage.setItem('domainUsers', JSON.stringify(updatedUsers));
+
+      const userToSave = {
+        id: foundUser.id,
+        email: foundUser.email,
+        name: foundUser.name,
+        role: foundUser.role,
+        isAdmin: foundUser.role === 'admin',
+        groupId: foundUser.groupId,
+      };
+
+      setUser(userToSave);
+      localStorage.setItem('currentUser', JSON.stringify(userToSave));
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
     }
-
-    if (foundUser.password !== password) {
-      throw new Error('Invalid email or password');
-    }
-
-    if (foundUser.status === 'pending') {
-      throw new Error('Please confirm your account through the email link first');
-    }
-
-    if (foundUser.status === 'inactive') {
-      throw new Error('Your account has been deactivated. Please contact an administrator');
-    }
-
-    // Update last login
-    const updatedUsers = users.map((u: any) =>
-      u.email === email ? { ...u, lastLogin: new Date().toISOString() } : u
-    );
-    localStorage.setItem('domainUsers', JSON.stringify(updatedUsers));
-
-    const userToSave = {
-      id: foundUser.id,
-      email: foundUser.email,
-      name: foundUser.name,
-      role: foundUser.role,
-      isAdmin: foundUser.role === 'admin',
-      groupId: foundUser.groupId,
-    };
-
-    setUser(userToSave);
-    localStorage.setItem('currentUser', JSON.stringify(userToSave));
   };
 
   const value = {
@@ -210,7 +218,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInWithEmail,
     register,
     signOut,
-    updateProfile
+    updateProfile,
+    login
   };
 
   return (

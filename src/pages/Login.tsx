@@ -14,16 +14,17 @@ import {
   FormControlLabel,
   useTheme,
   Container,
+  Paper,
 } from '@mui/material';
 import {
   Google as GoogleIcon,
-  Visibility,
-  VisibilityOff,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
   LightMode,
   DarkMode,
   MenuBook,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useGoogleLogin } from '@react-oauth/google';
 
@@ -60,7 +61,7 @@ const DEFAULT_USER = {
 
 export default function Login({ darkMode, onThemeChange }: LoginProps) {
   const navigate = useNavigate();
-  const { signInWithEmail, signInWithGoogle, register } = useAuth();
+  const { login, signInWithGoogle, register } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,20 +132,6 @@ export default function Login({ darkMode, onThemeChange }: LoginProps) {
     }
   };
 
-  const login = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        await signInWithGoogle();
-        navigate('/');
-      } catch (err) {
-        setError('Failed to sign in with Google');
-      }
-    },
-    onError: () => {
-      setError('Google sign in failed');
-    }
-  });
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -158,24 +145,24 @@ export default function Login({ darkMode, onThemeChange }: LoginProps) {
         await register(formData);
         navigate('/');
       } else {
-        // Check for default accounts
-        if (
-          formData.email === DEFAULT_ADMIN.email &&
-          formData.password === DEFAULT_ADMIN.password
-        ) {
-          await signInWithEmail(formData.email, formData.password, true);
-        } else if (
-          formData.email === DEFAULT_USER.email &&
-          formData.password === DEFAULT_USER.password
-        ) {
-          await signInWithEmail(formData.email, formData.password, false);
-        } else {
-          throw new Error('Invalid credentials');
-        }
+        await login(formData.email, formData.password);
         navigate('/');
       }
     } catch (err) {
-      setError('Authentication failed. Please check your credentials.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to sign in');
+      }
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+      navigate('/');
+    } catch (err) {
+      setError('Failed to sign in with Google');
     }
   };
 
@@ -280,7 +267,7 @@ export default function Login({ darkMode, onThemeChange }: LoginProps) {
             fullWidth
             variant="outlined"
             startIcon={<GoogleIcon />}
-            onClick={() => login()}
+            onClick={handleGoogleSignIn}
             sx={{
               mb: 3,
               py: 1.5,
@@ -291,7 +278,7 @@ export default function Login({ darkMode, onThemeChange }: LoginProps) {
               },
             }}
           >
-            Continue with Google
+            CONTINUE WITH GOOGLE
           </Button>
 
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
@@ -343,7 +330,7 @@ export default function Login({ darkMode, onThemeChange }: LoginProps) {
                       onClick={() => setShowPassword(!showPassword)}
                       edge="end"
                     >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                      {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                     </IconButton>
                   </InputAdornment>
                 ),
