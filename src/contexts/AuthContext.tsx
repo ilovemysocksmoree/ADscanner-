@@ -28,6 +28,7 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const DEFAULT_ADMIN = {
+  id: 'admin-1',
   email: 'admin@company.com',
   password: 'admin@123',
   isAdmin: true,
@@ -36,9 +37,13 @@ const DEFAULT_ADMIN = {
   phoneNumber: '+1 234 567 8900',
   region: 'North America',
   position: 'System Administrator',
+  role: 'admin',
+  status: 'active',
+  lastLogin: new Date().toISOString(),
 };
 
 const DEFAULT_USER = {
+  id: 'user-1',
   email: 'user@company.com',
   password: 'user@123',
   isAdmin: false,
@@ -47,6 +52,9 @@ const DEFAULT_USER = {
   phoneNumber: '+1 234 567 8901',
   region: 'North America',
   position: 'Security Analyst',
+  role: 'user',
+  status: 'active',
+  lastLogin: new Date().toISOString(),
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -57,9 +65,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in
+    // Initialize default users in localStorage if they don't exist
+    const initializeDefaultUsers = () => {
+      const savedUsers = localStorage.getItem('domainUsers');
+      if (!savedUsers) {
+        const defaultUsers = [DEFAULT_ADMIN, DEFAULT_USER];
+        localStorage.setItem('domainUsers', JSON.stringify(defaultUsers));
+      }
+    };
+
+    // Check if user is logged in and initialize default users
     const checkAuth = async () => {
       try {
+        initializeDefaultUsers();
         const savedUser = localStorage.getItem('currentUser');
         if (savedUser) {
           setUser(JSON.parse(savedUser));
@@ -97,22 +115,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithEmail = async (email: string, password: string, isAdmin: boolean = false) => {
     try {
-      // Check for default accounts
-      if (
-        (email === DEFAULT_ADMIN.email && password === DEFAULT_ADMIN.password) ||
-        (email === DEFAULT_USER.email && password === DEFAULT_USER.password)
-      ) {
-        const mockUser: User = {
-          id: isAdmin ? 'admin-1' : 'user-1',
-          email,
-          isAdmin,
-          ...(isAdmin ? DEFAULT_ADMIN : DEFAULT_USER),
-        };
-        setUser(mockUser);
-        localStorage.setItem('currentUser', JSON.stringify(mockUser));
-      } else {
-        throw new Error('Invalid credentials');
+      const savedUsers = localStorage.getItem('domainUsers');
+      const users = savedUsers ? JSON.parse(savedUsers) : [];
+      const foundUser = users.find((u: any) => u.email === email);
+
+      if (!foundUser) {
+        throw new Error('Invalid email or password');
       }
+
+      if (foundUser.password !== password) {
+        throw new Error('Invalid email or password');
+      }
+
+      if (foundUser.status === 'pending') {
+        throw new Error('Please confirm your account through the email link first');
+      }
+
+      if (foundUser.status === 'inactive') {
+        throw new Error('Your account has been deactivated. Please contact an administrator');
+      }
+
+      // Update last login
+      const updatedUsers = users.map((u: any) =>
+        u.email === email ? { ...u, lastLogin: new Date().toISOString() } : u
+      );
+      localStorage.setItem('domainUsers', JSON.stringify(updatedUsers));
+
+      const userToSave = {
+        id: foundUser.id,
+        email: foundUser.email,
+        name: foundUser.name,
+        role: foundUser.role,
+        isAdmin: foundUser.role === 'admin',
+        groupId: foundUser.groupId,
+      };
+
+      setUser(userToSave);
+      localStorage.setItem('currentUser', JSON.stringify(userToSave));
     } catch (error) {
       console.error('Email sign in failed:', error);
       throw error;
