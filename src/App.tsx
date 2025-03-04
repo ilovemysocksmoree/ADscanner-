@@ -13,6 +13,9 @@ import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
+import DomainGroups from './pages/admin/DomainGroups';
+import DomainUsers from './pages/admin/DomainUsers';
+import AddDomainUser from './pages/admin/AddDomainUser';
 
 const DRAWER_WIDTH = 240;
 
@@ -105,7 +108,7 @@ function App() {
                           height: '100vh',
                           overflow: 'auto',
                           position: 'relative',
-                          ml: `${DRAWER_WIDTH}px`,
+                          // ml: `${DRAWER_WIDTH}px`,
                           mt: '64px',
                           pl: 2,
                           pr: 4,
@@ -126,6 +129,13 @@ function App() {
                           <Route path="/network-scanner" element={<NetworkScanner />} />
                           <Route path="/reports" element={<Reports />} />
                           <Route path="/profile" element={<Profile />} />
+                          
+                          {/* Admin Routes */}
+                          <Route path="/admin/domain-groups" element={<DomainGroups />} />
+                          <Route path="/admin/domain-users" element={<DomainUsers />} />
+                          <Route path="/admin/add-domain-user" element={<AddDomainUser />} />
+                          <Route path="/admin/add-domain-user/:userId" element={<AddDomainUser />} />
+                          
                           <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                       </Box>
