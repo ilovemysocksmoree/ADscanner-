@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -18,7 +17,16 @@ import { AuthProvider } from './contexts/AuthContext';
 const DRAWER_WIDTH = 240;
 
 function App() {
-  const [darkMode, setDarkMode] = useState(true);
+  // Initialize darkMode from localStorage or default to true
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedMode = localStorage.getItem('darkMode');
+    return savedMode !== null ? JSON.parse(savedMode) : true;
+  });
+
+  // Save darkMode to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
 
   const theme = createTheme({
     palette: {
@@ -58,7 +66,7 @@ function App() {
   });
 
   const handleThemeChange = () => {
-    setDarkMode(!darkMode);
+    setDarkMode((prev) => !prev);
   };
 
   return (
@@ -66,52 +74,67 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-                    <Navbar darkMode={darkMode} onThemeChange={handleThemeChange} />
-                    <Sidebar />
-                    <Box
-                      component="main"
-                      sx={{
-                        flexGrow: 1,
-                        height: '100vh',
-                        overflow: 'auto',
-                        position: 'relative',
-                        ml: `${DRAWER_WIDTH}px`,
-                        mt: '64px',
-                        pl: 2,
-                        pr: 4,
-                        pt: 3,
-                        pb: 3,
-                        backgroundColor: 'background.default',
-                        borderLeft: '1px solid',
-                        borderColor: 'divider',
-                        '& > *': {
-                          maxWidth: 'calc(100% - 32px)',
-                          mx: 'auto',
-                        }
-                      }}
-                    >
-                      <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/vulnerability-scanner" element={<VulnerabilityScanner />} />
-                        <Route path="/network-scanner" element={<NetworkScanner />} />
-                        <Route path="/reports" element={<Reports />} />
-                        <Route path="/profile" element={<Profile />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                      </Routes>
+          <Box sx={{ 
+            minHeight: '100vh', 
+            bgcolor: 'background.default',
+            color: 'text.primary'
+          }}>
+            <Routes>
+              <Route path="/login" element={
+                <Box sx={{ 
+                  display: 'flex',
+                  minHeight: '100vh',
+                  bgcolor: 'background.default',
+                  color: 'text.primary'
+                }}>
+                  <Login darkMode={darkMode} onThemeChange={handleThemeChange} />
+                </Box>
+              } />
+              
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+                      <Navbar darkMode={darkMode} onThemeChange={handleThemeChange} />
+                      <Sidebar />
+                      <Box
+                        component="main"
+                        sx={{
+                          flexGrow: 1,
+                          height: '100vh',
+                          overflow: 'auto',
+                          position: 'relative',
+                          ml: `${DRAWER_WIDTH}px`,
+                          mt: '64px',
+                          pl: 2,
+                          pr: 4,
+                          pt: 3,
+                          pb: 3,
+                          backgroundColor: 'background.default',
+                          borderLeft: '1px solid',
+                          borderColor: 'divider',
+                          '& > *': {
+                            maxWidth: 'calc(100% - 32px)',
+                            mx: 'auto',
+                          }
+                        }}
+                      >
+                        <Routes>
+                          <Route path="/" element={<Dashboard />} />
+                          <Route path="/vulnerability-scanner" element={<VulnerabilityScanner />} />
+                          <Route path="/network-scanner" element={<NetworkScanner />} />
+                          <Route path="/reports" element={<Reports />} />
+                          <Route path="/profile" element={<Profile />} />
+                          <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                      </Box>
                     </Box>
-                  </Box>
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </Box>
         </Router>
       </AuthProvider>
     </ThemeProvider>
