@@ -27,6 +27,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useGoogleLogin } from '@react-oauth/google';
 
+interface LoginProps {
+  darkMode: boolean;
+  onThemeChange: () => void;
+}
+
 interface LoginFormData {
   email: string;
   password: string;
@@ -53,13 +58,12 @@ const DEFAULT_USER = {
   isAdmin: false,
 };
 
-export default function Login() {
+export default function Login({ darkMode, onThemeChange }: LoginProps) {
   const navigate = useNavigate();
   const { signInWithEmail, signInWithGoogle, register } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState(true);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
@@ -176,20 +180,13 @@ export default function Login() {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        bgcolor: darkMode ? 'background.default' : '#ffffff',
-        transition: 'all 0.3s ease',
-      }}
-    >
+    <Container maxWidth={false} disableGutters sx={{ display: 'flex', minHeight: '100vh' }}>
       {/* Left side - Illustration */}
       <Box
         sx={{
           display: { xs: 'none', md: 'flex' },
           width: '50%',
-          bgcolor: darkMode ? 'primary.dark' : '#1976d2',
+          bgcolor: 'primary.main',
           position: 'relative',
           overflow: 'hidden',
           alignItems: 'center',
@@ -217,352 +214,259 @@ export default function Login() {
             color: '#ffffff',
           }}
         >
-          <MenuBook sx={{ 
-            fontSize: 120, 
-            mb: 4, 
-            opacity: 0.9,
-            color: '#ffffff',
-          }} />
-          <Typography variant="h3" sx={{ 
-            mb: 2, 
-            fontWeight: 700,
-            textShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            color: '#ffffff',
-          }}>
+          <MenuBook sx={{ fontSize: 120, mb: 4, opacity: 0.9 }} />
+          <Typography variant="h3" sx={{ mb: 2, fontWeight: 700 }}>
             Ready to start your
           </Typography>
-          <Typography variant="h3" sx={{ 
-            mb: 3,
-            fontWeight: 700,
-            background: 'linear-gradient(45deg, #ffffff 30%, #f8f9fa 90%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            textShadow: '0 2px 4px rgba(0,0,0,0.2)',
-          }}>
+          <Typography variant="h3" sx={{ mb: 3, fontWeight: 700 }}>
             success story?
           </Typography>
-          <Typography variant="h6" sx={{ 
-            opacity: 0.9,
-            maxWidth: 400,
-            mx: 'auto',
-            lineHeight: 1.6,
-            color: '#ffffff',
-          }}>
+          <Typography variant="h6" sx={{ opacity: 0.9, maxWidth: 400, mx: 'auto', lineHeight: 1.6 }}>
             Join us to secure your network and protect your digital assets today!
           </Typography>
         </Box>
       </Box>
 
       {/* Right side - Login Form */}
-      <Container
-        maxWidth="sm"
+      <Box
         sx={{
+          flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
-          p: { xs: 2, sm: 4, md: 6 },
-          width: { xs: '100%', md: '50%' },
-          bgcolor: darkMode ? 'transparent' : '#ffffff',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          p: 4,
+          pt: 8,
+          position: 'relative',
+          maxWidth: '800px',
+          margin: '0 auto',
         }}
       >
-        <Box sx={{ mb: 5, textAlign: 'center' }}>
-          <Typography variant="h4" sx={{ 
-            fontWeight: 700,
-            mb: 2,
-            color: darkMode ? '#ffffff' : '#1565c0',
-          }}>
-            {isRegistering ? 'Create Account' : 'Welcome Back'}
+        {/* Theme Toggle */}
+        <IconButton
+          onClick={onThemeChange}
+          sx={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            color: 'text.primary',
+          }}
+        >
+          {darkMode ? <LightMode /> : <DarkMode />}
+        </IconButton>
+
+        <Box sx={{ width: '100%', maxWidth: '600px', mb: 4, textAlign: 'center' }}>
+          <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
+            Welcome Back
           </Typography>
-          <Typography variant="body1" color={darkMode ? 'text.secondary' : '#475569'}>
-            {isRegistering 
-              ? 'Fill in your details to get started'
-              : 'Sign in to access your dashboard'}
+          <Typography variant="body1" color="text.secondary">
+            Sign in to access your dashboard
           </Typography>
         </Box>
 
-        <FormControlLabel
-          control={
-            <Switch
-              checked={!darkMode}
-              onChange={() => setDarkMode(!darkMode)}
-              icon={<DarkMode />}
-              checkedIcon={<LightMode />}
-            />
-          }
-          label={darkMode ? 'Dark' : 'Light'}
-          sx={{ 
-            position: 'absolute',
-            right: 24,
-            top: 24,
-            color: darkMode ? '#fff' : '#475569',
-          }}
-        />
-
-        <Button
-          variant="outlined"
-          fullWidth
-          startIcon={<GoogleIcon />}
-          onClick={() => login()}
-          sx={{ 
-            py: 1.5,
-            borderRadius: 2,
-            textTransform: 'none',
-            fontSize: '1rem',
-            borderWidth: 2,
-            borderColor: darkMode ? 'rgba(255,255,255,0.2)' : '#1976d2',
-            color: darkMode ? '#fff' : '#1976d2',
-            '&:hover': {
-              borderWidth: 2,
-              borderColor: darkMode ? 'rgba(255,255,255,0.3)' : '#1565c0',
-              transform: 'translateY(-2px)',
-              boxShadow: '0 4px 12px rgba(25,118,210,0.15)',
-            },
+        <Box
+          sx={{
+            width: '100%',
+            maxWidth: '600px',
           }}
         >
-          Continue with Google
-        </Button>
-
-        <Divider sx={{ 
-          my: 4,
-          '&::before, &::after': {
-            borderColor: darkMode ? 'rgba(255,255,255,0.1)' : '#cbd5e1',
-          },
-        }}>
-          <Typography color={darkMode ? 'text.secondary' : '#475569'} sx={{ px: 2 }}>OR</Typography>
-        </Divider>
-
-        {error && (
-          <Alert 
-            severity="error" 
-            sx={{ 
-              mb: 3,
-              borderRadius: 2,
-              animation: 'slideDown 0.3s ease',
-              '@keyframes slideDown': {
-                from: { opacity: 0, transform: 'translateY(-10px)' },
-                to: { opacity: 1, transform: 'translateY(0)' },
-              },
-            }}
-          >
-            {error}
-          </Alert>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          {isRegistering && (
-            <>
-              <TextField
-                fullWidth
-                label="Company Name"
-                name="companyName"
-                value={formData.companyName}
-                onChange={handleInputChange}
-                required
-                error={!!formErrors.companyName}
-                helperText={formErrors.companyName}
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : '#f8fafc',
-                    '&:hover': {
-                      bgcolor: darkMode ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
-                    },
-                  },
-                  '& .MuiInputLabel-root': {
-                    color: darkMode ? '#fff' : '#475569',
-                  },
-                  '& .MuiOutlinedInput-input': {
-                    color: darkMode ? '#fff' : '#1e293b',
-                  },
-                }}
-              />
-              <TextField
-                fullWidth
-                label="Phone Number"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                required
-                error={!!formErrors.phoneNumber}
-                helperText={formErrors.phoneNumber}
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : '#f8fafc',
-                    '&:hover': {
-                      bgcolor: darkMode ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
-                    },
-                  },
-                  '& .MuiInputLabel-root': {
-                    color: darkMode ? '#fff' : '#475569',
-                  },
-                  '& .MuiOutlinedInput-input': {
-                    color: darkMode ? '#fff' : '#1e293b',
-                  },
-                }}
-              />
-            </>
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
           )}
-          
-          <TextField
+
+          <Button
             fullWidth
-            label="Email Address"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            required
-            error={!!formErrors.email}
-            helperText={formErrors.email}
-            sx={{ 
-              mb: 2,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : '#f8fafc',
-                '&:hover': {
-                  bgcolor: darkMode ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
-                },
-              },
-              '& .MuiInputLabel-root': {
-                color: darkMode ? '#fff' : '#475569',
-              },
-              '& .MuiOutlinedInput-input': {
-                color: darkMode ? '#fff' : '#1e293b',
-              },
-            }}
-          />
-          
-          <TextField
-            fullWidth
-            label="Password"
-            name="password"
-            type={showPassword ? 'text' : 'password'}
-            value={formData.password}
-            onChange={handleInputChange}
-            required
-            error={!!formErrors.password}
-            helperText={formErrors.password}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowPassword(!showPassword)}
-                    edge="end"
-                    sx={{
-                      color: darkMode ? '#fff' : '#475569',
-                    }}
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-            sx={{ 
+            variant="outlined"
+            startIcon={<GoogleIcon />}
+            onClick={() => login()}
+            sx={{
               mb: 3,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : '#f8fafc',
-                '&:hover': {
-                  bgcolor: darkMode ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
-                },
-              },
-              '& .MuiInputLabel-root': {
-                color: darkMode ? '#fff' : '#475569',
-              },
-              '& .MuiOutlinedInput-input': {
-                color: darkMode ? '#fff' : '#1e293b',
-              },
-            }}
-          />
-
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            sx={{ 
               py: 1.5,
-              borderRadius: 2,
-              textTransform: 'none',
-              fontSize: '1rem',
-              fontWeight: 600,
-              background: darkMode
-                ? 'linear-gradient(45deg, #2196f3 30%, #1976d2 90%)'
-                : 'linear-gradient(45deg, #1565c0 30%, #1976d2 90%)',
-              boxShadow: '0 2px 8px rgba(25,118,210,0.3)',
+              borderRadius: 1,
+              borderColor: 'divider',
               '&:hover': {
-                transform: 'translateY(-2px)',
-                boxShadow: '0 4px 12px rgba(25,118,210,0.4)',
+                borderColor: 'primary.main',
               },
             }}
           >
-            {isRegistering ? 'Create Account' : 'Sign In'}
+            Continue with Google
           </Button>
 
-          <Button
-            fullWidth
-            onClick={() => {
-              setIsRegistering(!isRegistering);
-              setFormErrors({});
-              setError(null);
-            }}
-            sx={{ 
-              mt: 2,
-              textTransform: 'none',
-              fontSize: '0.9rem',
-              color: darkMode ? 'text.secondary' : '#475569',
-              '&:hover': {
-                background: 'transparent',
-                color: '#1565c0',
-              },
-            }}
-          >
-            {isRegistering
-              ? 'Already have an account? Sign in'
-              : "Don't have an account? Register"}
-          </Button>
-        </form>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <Divider sx={{ flex: 1 }} />
+            <Typography variant="body2" color="text.secondary" sx={{ mx: 2 }}>
+              OR
+            </Typography>
+            <Divider sx={{ flex: 1 }} />
+          </Box>
 
-        {!isRegistering && (
-          <Box
-            sx={{ 
-              mt: 4,
-              p: 2,
-              bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : '#f8fafc',
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: darkMode ? 'rgba(255,255,255,0.1)' : '#cbd5e1',
-            }}
-          >
-            <Typography 
-              variant="body2" 
-              color={darkMode ? 'text.secondary' : '#1e293b'}
-              align="center"
-              sx={{ 
-                fontSize: '0.9rem',
-                mb: 1,
-                fontWeight: 500,
+          <form onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label="Email Address"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              error={!!formErrors.email}
+              helperText={formErrors.email}
+              sx={{
+                mb: 2.5,
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 1,
+                  bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : 'background.paper',
+                  '& fieldset': {
+                    borderColor: 'divider',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'primary.main',
+                  },
+                },
+              }}
+            />
+
+            <TextField
+              fullWidth
+              label="Password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              value={formData.password}
+              onChange={handleInputChange}
+              error={!!formErrors.password}
+              helperText={formErrors.password}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                mb: 3,
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 1,
+                  bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : 'background.paper',
+                  '& fieldset': {
+                    borderColor: 'divider',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'primary.main',
+                  },
+                },
+              }}
+            />
+
+            {isRegistering && (
+              <>
+                <TextField
+                  fullWidth
+                  label="Company Name"
+                  name="companyName"
+                  value={formData.companyName}
+                  onChange={handleInputChange}
+                  error={!!formErrors.companyName}
+                  helperText={formErrors.companyName}
+                  sx={{
+                    mb: 2.5,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 1,
+                      bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : 'background.paper',
+                      '& fieldset': {
+                        borderColor: 'divider',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: 'primary.main',
+                      },
+                    },
+                  }}
+                />
+
+                <TextField
+                  fullWidth
+                  label="Phone Number"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={handleInputChange}
+                  error={!!formErrors.phoneNumber}
+                  helperText={formErrors.phoneNumber}
+                  sx={{
+                    mb: 3,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 1,
+                      bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : 'background.paper',
+                      '& fieldset': {
+                        borderColor: 'divider',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: 'primary.main',
+                      },
+                    },
+                  }}
+                />
+              </>
+            )}
+
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              size="large"
+              sx={{
+                mb: 2.5,
+                py: 1.5,
+                borderRadius: 1,
+                textTransform: 'none',
+                fontSize: '1rem',
               }}
             >
+              {isRegistering ? 'Register' : 'Sign In'}
+            </Button>
+
+            <Box sx={{ textAlign: 'center', mb: 3 }}>
+              <Button
+                onClick={() => setIsRegistering(!isRegistering)}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: '0.95rem',
+                }}
+              >
+                {isRegistering
+                  ? 'Already have an account? Sign In'
+                  : "Don't have an account? Register"}
+              </Button>
+            </Box>
+          </form>
+
+          {/* Test Accounts Info */}
+          <Box 
+            sx={{ 
+              mt: 2,
+              p: 2.5,
+              borderRadius: 1,
+              bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : 'action.hover',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Typography variant="subtitle2" gutterBottom>
               Test Accounts
             </Typography>
-            <Divider sx={{ 
-              my: 1,
-              borderColor: darkMode ? 'rgba(255,255,255,0.1)' : '#cbd5e1',
-            }} />
-            <Typography 
-              variant="body2" 
-              color={darkMode ? 'text.secondary' : '#475569'}
-              align="center"
-              sx={{ fontSize: '0.8rem' }}
-            >
-              Admin: {DEFAULT_ADMIN.email} / {DEFAULT_ADMIN.password}<br />
-              User: {DEFAULT_USER.email} / {DEFAULT_USER.password}
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              Admin: admin@company.com / admin@123
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              User: user@company.com / user@123
             </Typography>
           </Box>
-        )}
-      </Container>
-    </Box>
+        </Box>
+      </Box>
+    </Container>
   );
 } 
