@@ -12,7 +12,13 @@ import {
   Alert,
   FormHelperText,
   SelectChangeEvent,
+  IconButton,
+  InputAdornment,
 } from '@mui/material';
+import {
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
+} from '@mui/icons-material';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { loggingService } from '../../services/LoggingService';
@@ -25,23 +31,67 @@ interface DomainGroup {
 interface FormData {
   name: string;
   email: string;
+  password: string;
   groupId: string;
   role: string;
-  status: 'active' | 'inactive';
+  status: 'pending' | 'active' | 'inactive';
 }
 
 interface FormErrors {
   name?: string;
   email?: string;
+  password?: string;
   groupId?: string;
   role?: string;
 }
+
+const generatePassword = () => {
+  const length = 12;
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
+};
+
+const sendConfirmationEmail = async (email: string, password: string, name: string) => {
+  // In a real application, this would use a proper email service
+  // For demonstration, we'll log the email content
+  const emailContent = `
+    Dear ${name},
+
+    An administrator has created an account for you. Please use the following credentials to log in:
+
+    Email: ${email}
+    Password: ${password}
+
+    Please click the following link to confirm your account:
+    http://yourdomain.com/confirm-account?email=${encodeURIComponent(email)}
+
+    This is a temporary password. You will be prompted to change it upon your first login.
+
+    Best regards,
+    Your Application Team
+  `;
+
+  console.log('Confirmation email content:', emailContent);
+  
+  // In a real application, you would use an email service like SendGrid:
+  // await sendGrid.send({
+  //   to: email,
+  //   from: 'your-app@domain.com',
+  //   subject: 'Confirm Your Account',
+  //   text: emailContent,
+  // });
+};
 
 export default function AddDomainUser() {
   const navigate = useNavigate();
   const { userId } = useParams();
   const location = useLocation();
   const { user } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
   const [groups] = useState<DomainGroup[]>(() => {
     const saved = localStorage.getItem('domainGroups');
     return saved ? JSON.parse(saved) : [];
@@ -49,9 +99,10 @@ export default function AddDomainUser() {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
+    password: generatePassword(),
     groupId: location.state?.groupId || '',
     role: 'user',
-    status: 'active',
+    status: 'pending',
   });
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [error, setError] = useState<string | null>(null);
@@ -64,13 +115,15 @@ export default function AddDomainUser() {
     }
 
     if (userId) {
-      // Load user data if editing
       const savedUsers = localStorage.getItem('domainUsers');
       const users = savedUsers ? JSON.parse(savedUsers) : [];
       const userToEdit = users.find((u: any) => u.id === userId);
       
       if (userToEdit) {
-        setFormData(userToEdit);
+        setFormData({
+          ...userToEdit,
+          password: '', // Don't load existing password
+        });
       } else {
         setError('User not found');
       }
@@ -98,6 +151,11 @@ export default function AddDomainUser() {
       isValid = false;
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       errors.email = 'Email is invalid';
+      isValid = false;
+    }
+
+    if (!userId && !formData.password) {
+      errors.password = 'Password is required for new users';
       isValid = false;
     }
 
@@ -148,19 +206,32 @@ export default function AddDomainUser() {
         const newUser = {
           ...formData,
           id: Math.random().toString(36).substr(2, 9),
-          lastLogin: new Date().toISOString(),
+          lastLogin: null,
+          status: 'pending',
         };
         
         localStorage.setItem('domainUsers', JSON.stringify([...users, newUser]));
         
-        loggingService.addLog(
-          user,
-          'CREATE_USER',
-          `Created new user: ${formData.email}`,
-          '/admin/add-domain-user'
-        );
+        // Send confirmation email
+        try {
+          await sendConfirmationEmail(formData.email, formData.password, formData.name);
+          loggingService.addLog(
+            user,
+            'CREATE_USER',
+            `Created new user: ${formData.email} and sent confirmation email`,
+            '/admin/add-domain-user'
+          );
+        } catch (error) {
+          console.error('Failed to send confirmation email:', error);
+          loggingService.addLog(
+            user,
+            'ERROR',
+            `Failed to send confirmation email to: ${formData.email}`,
+            '/admin/add-domain-user'
+          );
+        }
         
-        setSuccess('User created successfully');
+        setSuccess('User created successfully and confirmation email sent');
       }
 
       // Update group user count
@@ -198,6 +269,14 @@ export default function AddDomainUser() {
         [name]: undefined
       }));
     }
+  };
+
+  const handleGeneratePassword = () => {
+    const newPassword = generatePassword();
+    setFormData(prev => ({
+      ...prev,
+      password: newPassword
+    }));
   };
 
   return (
@@ -243,6 +322,42 @@ export default function AddDomainUser() {
             sx={{ mb: 2 }}
           />
 
+          {!userId && (
+            <TextField
+              fullWidth
+              label="Password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              value={formData.password}
+              onChange={handleInputChange}
+              error={!!formErrors.password}
+              helperText={formErrors.password}
+              sx={{ mb: 2 }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          )}
+
+          {!userId && (
+            <Button
+              variant="outlined"
+              onClick={handleGeneratePassword}
+              sx={{ mb: 2 }}
+            >
+              Generate Random Password
+            </Button>
+          )}
+
           <FormControl fullWidth error={!!formErrors.groupId} sx={{ mb: 2 }}>
             <InputLabel>Domain Group</InputLabel>
             <Select
@@ -277,19 +392,6 @@ export default function AddDomainUser() {
             {formErrors.role && (
               <FormHelperText>{formErrors.role}</FormHelperText>
             )}
-          </FormControl>
-
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <InputLabel>Status</InputLabel>
-            <Select
-              name="status"
-              value={formData.status}
-              onChange={handleInputChange}
-              label="Status"
-            >
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-            </Select>
           </FormControl>
 
           <Box sx={{ display: 'flex', gap: 2 }}>

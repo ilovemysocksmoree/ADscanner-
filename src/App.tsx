@@ -17,6 +17,7 @@ import DomainGroups from './pages/admin/DomainGroups';
 import DomainUsers from './pages/admin/DomainUsers';
 import AddDomainUser from './pages/admin/AddDomainUser';
 import AdminLogs from './pages/admin/AdminLogs';
+import ConfirmAccount from './pages/ConfirmAccount';
 
 const DRAWER_WIDTH = 240;
 
@@ -95,6 +96,17 @@ function App() {
                 </Box>
               } />
               
+              <Route path="/confirm-account" element={
+                <Box sx={{ 
+                  display: 'flex',
+                  minHeight: '100vh',
+                  bgcolor: 'background.default',
+                  color: 'text.primary'
+                }}>
+                  <ConfirmAccount />
+                </Box>
+              } />
+
               <Route
                 path="/*"
                 element={
