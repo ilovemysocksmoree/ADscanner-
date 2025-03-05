@@ -32,6 +32,8 @@ import {
   Share as ShareIcon,
   DateRange as DateRangeIcon,
 } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import { loggingService } from '../services/LoggingService';
 
 interface ScanReport {
   id: string;
@@ -106,6 +108,7 @@ const mockReportDetails: Report[] = [
 ];
 
 export default function Reports() {
+  const { user } = useAuth();
   const [selectedReport, setSelectedReport] = useState<ScanReport | null>(null);
   const [exportFormat, setExportFormat] = useState('pdf');
   const [openDialog, setOpenDialog] = useState(false);
@@ -116,6 +119,13 @@ export default function Reports() {
   const handleExportClick = (report: ScanReport) => {
     setSelectedReport(report);
     setOpenDialog(true);
+    
+    loggingService.addLog(
+      user,
+      'OPEN_REPORT_EXPORT',
+      `Opened export dialog for report: ${report.id}`,
+      '/reports'
+    );
   };
 
   const handleFormatChange = (event: SelectChangeEvent) => {
@@ -123,8 +133,15 @@ export default function Reports() {
   };
 
   const handleExport = () => {
-    // Implement report generation and download
-    console.log(`Exporting report ${selectedReport?.id} as ${exportFormat}`);
+    if (!selectedReport) return;
+    
+    loggingService.addLog(
+      user,
+      'EXPORT_REPORT',
+      `Exported report ${selectedReport.id} as ${exportFormat}`,
+      '/reports'
+    );
+    
     setOpenDialog(false);
   };
 
@@ -140,8 +157,39 @@ export default function Reports() {
   };
 
   const handleGenerateReport = () => {
-    // Implement report generation logic
-    console.log('Generating report:', { reportType, dateRange });
+    loggingService.addLog(
+      user,
+      'GENERATE_REPORT',
+      `Generated ${reportType} report for last ${dateRange} days`,
+      '/reports'
+    );
+  };
+
+  const handleDownload = (reportId: string) => {
+    loggingService.addLog(
+      user,
+      'DOWNLOAD_REPORT',
+      `Downloaded report: ${reportId}`,
+      '/reports'
+    );
+  };
+
+  const handlePrint = (reportId: string) => {
+    loggingService.addLog(
+      user,
+      'PRINT_REPORT',
+      `Printed report: ${reportId}`,
+      '/reports'
+    );
+  };
+
+  const handleShare = (reportId: string) => {
+    loggingService.addLog(
+      user,
+      'SHARE_REPORT',
+      `Shared report: ${reportId}`,
+      '/reports'
+    );
   };
 
   return (
@@ -235,21 +283,21 @@ export default function Reports() {
                           <IconButton
                             size="small"
                             color="primary"
-                            onClick={() => console.log('Download:', report.id)}
+                            onClick={() => handleDownload(report.id)}
                           >
                             <DownloadIcon />
                           </IconButton>
                           <IconButton
                             size="small"
                             color="primary"
-                            onClick={() => console.log('Print:', report.id)}
+                            onClick={() => handlePrint(report.id)}
                           >
                             <PrintIcon />
                           </IconButton>
                           <IconButton
                             size="small"
                             color="primary"
-                            onClick={() => console.log('Share:', report.id)}
+                            onClick={() => handleShare(report.id)}
                           >
                             <ShareIcon />
                           </IconButton>
