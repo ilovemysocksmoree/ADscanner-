@@ -22,6 +22,7 @@ const ROUTE_PERMISSIONS = {
   '/admin/domain-groups': { role: 'admin', permissions: ['manage_domains'] },
   '/admin/domain-users': { role: 'admin', permissions: ['manage_users'] },
   '/admin/add-domain-user': { role: 'admin', permissions: ['manage_users'] },
+  '/admin/role-management': { role: 'admin', permissions: ['manage_users'] },
   '/admin/logs': { role: 'admin', permissions: ['view_logs'] },
   '/admin/settings': { role: 'admin', permissions: ['manage_settings'] },
   '/admin/profile': { role: 'admin', permissions: ['manage_profile'] },

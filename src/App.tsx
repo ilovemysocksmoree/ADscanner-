@@ -18,6 +18,7 @@ import DomainUsers from './pages/admin/DomainUsers';
 import AddDomainUser from './pages/admin/AddDomainUser';
 import AdminLogs from './pages/admin/AdminLogs';
 import ConfirmAccount from './pages/ConfirmAccount';
+import RoleManagement from './pages/RoleManagement';
 
 const DRAWER_WIDTH = 240;
 
@@ -171,6 +172,7 @@ function App() {
                           <Route path="/admin/domain-users" element={<DomainUsers />} />
                           <Route path="/admin/add-domain-user" element={<AddDomainUser />} />
                           <Route path="/admin/add-domain-user/:userId" element={<AddDomainUser />} />
+                          <Route path="/admin/role-management" element={<RoleManagement />} />
                           <Route path="/admin/logs" element={<AdminLogs />} />
                           
                           <Route path="*" element={<Navigate to="/" replace />} />

@@ -20,6 +20,7 @@ import {
   People as PeopleIcon,
   PersonAdd as PersonAddIcon,
   Assessment as AssessmentIcon,
+  AdminPanelSettings as RoleIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -36,6 +37,7 @@ const adminNavigationItems = [
   { path: '/admin/domain-groups', label: 'Domain Groups', icon: <GroupIcon /> },
   { path: '/admin/domain-users', label: 'Domain Users', icon: <PeopleIcon /> },
   { path: '/admin/add-domain-user', label: 'Add Domain Users', icon: <PersonAddIcon /> },
+  { path: '/admin/role-management', label: 'Role Management', icon: <RoleIcon /> },
   { path: '/admin/logs', label: 'Activity Logs', icon: <AssessmentIcon /> },
 ];
 
