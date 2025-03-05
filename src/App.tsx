@@ -74,6 +74,29 @@ function App() {
     setDarkMode((prev) => !prev);
   };
 
+  const isAdminRoute = (path: string) => {
+    return path.startsWith('/admin/');
+  };
+
+  const hasResourceAccess = (resourceId: string | null) => {
+    if (!resourceId) return true;
+    if (user.isAdmin) return true;
+    
+    const savedUsers = localStorage.getItem('domainUsers');
+    const users = savedUsers ? JSON.parse(savedUsers) : [];
+    const targetUser = users.find((u: any) => u.id === resourceId);
+    
+    // If resource doesn't exist, deny access
+    if (!targetUser) return false;
+    
+    // Allow access only if it's the user's own resource
+    return targetUser.email === user.email;
+  };
+
+  const urlParts = location.pathname.split('/');
+  const resourceId = urlParts[urlParts.length - 1];
+  const isResourceRequest = !['domain-groups', 'domain-users', 'add-domain-user', 'logs'].includes(resourceId);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

@@ -39,9 +39,39 @@ export default function ConfirmAccount() {
     const emailParam = params.get('email');
     if (emailParam) {
       setEmail(emailParam);
-      // In a real application, you would verify the confirmation token here
+      console.log('Confirming account for email:', emailParam);
+      
+      // Check if user exists and is in pending status
+      const savedUsers = localStorage.getItem('domainUsers');
+      console.log('Retrieved users from localStorage:', savedUsers);
+      
+      if (savedUsers) {
+        const users = JSON.parse(savedUsers);
+        console.log('Parsed users:', users);
+        
+        const user = users.find((u: any) => u.email.toLowerCase() === emailParam.toLowerCase());
+        console.log('Found user:', user);
+        
+        if (!user) {
+          console.error('User not found in localStorage for email:', emailParam);
+          setError('User not found');
+        } else if (user.status === 'active') {
+          console.log('User already confirmed:', user);
+          setError('Account is already confirmed');
+        } else if (user.status === 'inactive') {
+          console.log('User account inactive:', user);
+          setError('Account is deactivated. Please contact administrator');
+        } else {
+          console.log('User ready for confirmation:', user);
+        }
+      } else {
+        console.error('No users found in localStorage');
+        setError('User database not found');
+      }
+      
       setLoading(false);
     } else {
+      console.error('No email parameter found in URL');
       setError('Invalid confirmation link');
       setLoading(false);
     }
@@ -50,14 +80,26 @@ export default function ConfirmAccount() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    console.log('Handling confirmation submit for email:', email);
 
+    // Password validation
     if (newPassword.length < 8) {
       setError('Password must be at least 8 characters long');
       return;
     }
 
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
-      setError('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+    if (!/(?=.*[a-z])/.test(newPassword)) {
+      setError('Password must contain at least one lowercase letter');
+      return;
+    }
+
+    if (!/(?=.*[A-Z])/.test(newPassword)) {
+      setError('Password must contain at least one uppercase letter');
+      return;
+    }
+
+    if (!/(?=.*\d)/.test(newPassword)) {
+      setError('Password must contain at least one number');
       return;
     }
 
@@ -69,36 +111,70 @@ export default function ConfirmAccount() {
     try {
       // Get the user from localStorage
       const savedUsers = localStorage.getItem('domainUsers');
-      const users = savedUsers ? JSON.parse(savedUsers) : [];
-      const userIndex = users.findIndex((u: any) => u.email === email);
+      console.log('Retrieved users for update:', savedUsers);
+      
+      if (!savedUsers) {
+        console.error('User database not found during confirmation');
+        setError('User database not found');
+        return;
+      }
+
+      const users = JSON.parse(savedUsers);
+      console.log('Parsed users for update:', users);
+      
+      const userIndex = users.findIndex((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      console.log('Found user index:', userIndex);
 
       if (userIndex === -1) {
+        console.error('User not found during confirmation for email:', email);
         setError('User not found');
         return;
       }
 
+      // Verify user status
+      if (users[userIndex].status === 'active') {
+        console.log('User already confirmed during update:', users[userIndex]);
+        setError('Account is already confirmed');
+        return;
+      }
+
+      if (users[userIndex].status === 'inactive') {
+        console.log('User inactive during update:', users[userIndex]);
+        setError('Account is deactivated. Please contact administrator');
+        return;
+      }
+
       // Update user status and password
-      users[userIndex] = {
+      const updatedUser = {
         ...users[userIndex],
         status: 'active',
-        password: newPassword, // In a real app, this would be hashed
+        password: newPassword,
+        lastLogin: new Date().toISOString()
       };
+      users[userIndex] = updatedUser;
+      console.log('Updating user to:', updatedUser);
 
+      // Save updated users
       localStorage.setItem('domainUsers', JSON.stringify(users));
+      console.log('Saved updated users to localStorage');
 
+      // Log the confirmation
       loggingService.addLog(
-        users[userIndex],
+        updatedUser,
         'CONFIRM_ACCOUNT',
         'User confirmed account and set new password',
         '/confirm-account'
       );
 
       setConfirmed(true);
+      console.log('Account confirmation successful');
+      
       setTimeout(() => {
         navigate('/login');
       }, 2000);
     } catch (error) {
-      setError('Failed to confirm account');
+      console.error('Failed to confirm account:', error);
+      setError('Failed to confirm account. Please try again.');
     }
   };
 
@@ -163,89 +239,87 @@ export default function ConfirmAccount() {
             </Alert>
           )}
 
-          {!confirmed && (
-            <form onSubmit={handleSubmit}>
-              <TextField
-                fullWidth
-                label="Email"
-                value={email}
-                disabled
-                sx={{ mb: 3 }}
-                InputProps={{
-                  sx: { bgcolor: 'action.hover' }
-                }}
-              />
+          <form onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label="Email"
+              value={email}
+              disabled
+              sx={{ mb: 3 }}
+              InputProps={{
+                sx: { bgcolor: 'action.hover' }
+              }}
+            />
 
-              <TextField
-                fullWidth
-                label="New Password"
-                type={showPassword ? 'text' : 'password'}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                sx={{ mb: 3 }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            <TextField
+              fullWidth
+              label="New Password"
+              type={showPassword ? 'text' : 'password'}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              sx={{ mb: 3 }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
 
-              <TextField
-                fullWidth
-                label="Confirm Password"
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                sx={{ mb: 3 }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        edge="end"
-                      >
-                        {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            <TextField
+              fullWidth
+              label="Confirm Password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              sx={{ mb: 3 }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      edge="end"
+                    >
+                      {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
 
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Password must:
-                <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
-                  <li>Be at least 8 characters long</li>
-                  <li>Contain at least one uppercase letter</li>
-                  <li>Contain at least one lowercase letter</li>
-                  <li>Contain at least one number</li>
-                </ul>
-              </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Password must:
+              <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+                <li>Be at least 8 characters long</li>
+                <li>Contain at least one uppercase letter</li>
+                <li>Contain at least one lowercase letter</li>
+                <li>Contain at least one number</li>
+              </ul>
+            </Typography>
 
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size="large"
-                sx={{
-                  py: 1.5,
-                  mt: 2,
-                  bgcolor: 'primary.main',
-                  '&:hover': {
-                    bgcolor: 'primary.dark',
-                  },
-                }}
-              >
-                Confirm Account
-              </Button>
-            </form>
-          )}
+            <Button
+              type="submit"
+              variant="contained"
+              fullWidth
+              size="large"
+              sx={{
+                py: 1.5,
+                mt: 2,
+                bgcolor: 'primary.main',
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                },
+              }}
+            >
+              Confirm Account
+            </Button>
+          </form>
         </Paper>
       </Box>
     </Container>
