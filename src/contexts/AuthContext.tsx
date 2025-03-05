@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CircularProgress, Box } from '@mui/material';
 import { EmailService } from '../services/EmailService';
+import { loggingService } from '../services/LoggingService';
 
 interface User {
   id: string;
@@ -282,6 +283,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      // Log the logout action before clearing the user
+      if (user) {
+        loggingService.addLog(
+          user,
+          'LOGOUT',
+          'User logged out',
+          window.location.pathname
+        );
+      }
+      
       setUser(null);
       localStorage.removeItem('currentUser');
     } catch (error) {
@@ -293,14 +304,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (userData: Partial<User>) => {
     try {
       if (!user) throw new Error('No user logged in');
-      
+
+      const savedUsers = localStorage.getItem('domainUsers');
+      if (!savedUsers) throw new Error('User database not found');
+
+      const users = JSON.parse(savedUsers);
+      const userIndex = users.findIndex((u: any) => u.id === user.id);
+
+      if (userIndex === -1) throw new Error('User not found');
+
+      // Update user data
       const updatedUser = {
-        ...user,
+        ...users[userIndex],
         ...userData,
+        lastUpdated: new Date().toISOString()
       };
-      
-      setUser(updatedUser);
-      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      users[userIndex] = updatedUser;
+
+      // Save to localStorage
+      localStorage.setItem('domainUsers', JSON.stringify(users));
+
+      // Update current user session
+      const userToSave = {
+        ...user,
+        ...userData
+      };
+      setUser(userToSave);
+      localStorage.setItem('currentUser', JSON.stringify(userToSave));
+
+      // Log profile update
+      loggingService.addLog(
+        user,
+        'UPDATE_PROFILE',
+        'User updated their profile',
+        '/profile'
+      );
     } catch (error) {
       console.error('Profile update failed:', error);
       throw error;
@@ -319,10 +357,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const users = JSON.parse(savedUsers);
-      console.log('Found users in localStorage:', users);
-
-      // Find user by email
       const foundUser = users.find((u: any) => u.email === email);
+      
       if (!foundUser) {
         console.error('User not found:', email);
         throw new Error('Invalid email or password');
@@ -342,6 +378,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Verify password
       if (foundUser.password !== password) {
         console.error('Invalid password for user:', email);
+        loggingService.addLog(
+          foundUser,
+          'LOGIN_FAILED',
+          'Failed login attempt - invalid password',
+          '/login'
+        );
         throw new Error('Invalid email or password');
       }
 
@@ -369,6 +411,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(userToSave);
       localStorage.setItem('currentUser', JSON.stringify(userToSave));
+      
+      // Log successful login
+      loggingService.addLog(
+        userToSave,
+        'LOGIN_SUCCESS',
+        'User logged in successfully',
+        '/login'
+      );
+      
       console.log('Login successful:', userToSave);
     } catch (error) {
       console.error('Login failed:', error);
