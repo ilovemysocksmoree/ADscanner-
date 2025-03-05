@@ -22,6 +22,8 @@ import {
   Stop as StopIcon,
 } from '@mui/icons-material';
 import AlertBar from '../components/AlertBar';
+import { useAuth } from '../contexts/AuthContext';
+import { loggingService } from '../services/LoggingService';
 
 interface NetworkDevice {
   ip: string;
@@ -82,6 +84,7 @@ const mockNetworkAlerts: NetworkAlert[] = [
 ];
 
 export default function NetworkScanner() {
+  const { user } = useAuth();
   const [networkRange, setNetworkRange] = useState('192.168.1.0/24');
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
@@ -91,10 +94,18 @@ export default function NetworkScanner() {
 
   const handleStartScan = () => {
     setIsScanning(true);
+    loggingService.addLog(
+      user,
+      'START_NETWORK_SCAN',
+      `Started network scan on range: ${networkRange}`,
+      '/network-scanner'
+    );
+
     // Simulate network scan
     setTimeout(() => {
       setDevices(mockDevices);
       setIsScanning(false);
+      
       // Simulate finding new network activity
       const newAlert: NetworkAlert = {
         id: Date.now().toString(),
@@ -103,11 +114,24 @@ export default function NetworkScanner() {
         severity: 'warning',
       };
       setAlerts(prev => [...prev, newAlert]);
+
+      loggingService.addLog(
+        user,
+        'NETWORK_SCAN_COMPLETE',
+        `Completed network scan on range: ${networkRange}. Found ${mockDevices.length} devices`,
+        '/network-scanner'
+      );
     }, 3000);
   };
 
   const handleStopScan = () => {
     setIsScanning(false);
+    loggingService.addLog(
+      user,
+      'STOP_NETWORK_SCAN',
+      `Stopped network scan on range: ${networkRange}`,
+      '/network-scanner'
+    );
   };
 
   const handleTakeAction = (alertId: string) => {
@@ -115,12 +139,27 @@ export default function NetworkScanner() {
     setSnackbarMessage(`Investigating network activity${alert?.deviceIp ? ` for device ${alert.deviceIp}` : ''}`);
     setSnackbarOpen(true);
     setAlerts(alerts.filter(alert => alert.id !== alertId));
+
+    loggingService.addLog(
+      user,
+      'NETWORK_ALERT_ACTION',
+      `Took action on network alert: ${alert?.title}`,
+      '/network-scanner'
+    );
   };
 
   const handleMarkBenign = (alertId: string) => {
+    const alert = alerts.find(a => a.id === alertId);
     setSnackbarMessage('Network activity marked as normal');
     setSnackbarOpen(true);
     setAlerts(alerts.filter(alert => alert.id !== alertId));
+
+    loggingService.addLog(
+      user,
+      'NETWORK_ALERT_BENIGN',
+      `Marked network alert as benign: ${alert?.title}`,
+      '/network-scanner'
+    );
   };
 
   return (
