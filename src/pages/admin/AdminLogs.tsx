@@ -31,17 +31,70 @@ import { useAuth } from '../../contexts/AuthContext';
 import { loggingService, LogEntry } from '../../services/LoggingService';
 
 const actionTypes = [
-  'PAGE_VIEW',
+  // Authentication
   'LOGIN',
   'LOGOUT',
+  'REGISTER',
+  'PASSWORD_RESET',
+  'ACCOUNT_CONFIRMATION',
+  
+  // User Management
   'CREATE_USER',
   'UPDATE_USER',
   'DELETE_USER',
+  'EXPORT_USERS',
+  
+  // Domain Groups
   'CREATE_DOMAIN_GROUP',
   'UPDATE_DOMAIN_GROUP',
   'DELETE_DOMAIN_GROUP',
-  'EXPORT_USERS',
+  
+  // Role Management
+  'ADD_ROLE',
+  'EDIT_ROLE',
+  'DELETE_ROLE',
+  
+  // Scanning Activities
+  'START_VULNERABILITY_SCAN',
+  'STOP_VULNERABILITY_SCAN',
+  'VULNERABILITY_SCAN_COMPLETE',
+  'VULNERABILITY_SCAN_ERROR',
+  'START_NETWORK_SCAN',
+  'STOP_NETWORK_SCAN',
+  'NETWORK_SCAN_COMPLETE',
+  'NETWORK_SCAN_ERROR',
+  
+  // Alerts and Actions
+  'VULNERABILITY_ACTION_TAKEN',
+  'VULNERABILITY_MARKED_BENIGN',
+  'NETWORK_ALERT_ACTION',
+  'NETWORK_ALERT_BENIGN',
+  
+  // Reports
+  'GENERATE_REPORT',
+  'EXPORT_REPORT',
+  'DOWNLOAD_REPORT',
+  'SHARE_REPORT',
+  
+  // System
+  'PAGE_VIEW',
+  'EXPORT_LOGS',
+  'CLEAR_LOGS',
 ];
+
+const actionCategories = {
+  'Authentication': ['LOGIN', 'LOGOUT', 'REGISTER', 'PASSWORD_RESET', 'ACCOUNT_CONFIRMATION'],
+  'User Management': ['CREATE_USER', 'UPDATE_USER', 'DELETE_USER', 'EXPORT_USERS'],
+  'Domain Groups': ['CREATE_DOMAIN_GROUP', 'UPDATE_DOMAIN_GROUP', 'DELETE_DOMAIN_GROUP'],
+  'Role Management': ['ADD_ROLE', 'EDIT_ROLE', 'DELETE_ROLE'],
+  'Scanning': [
+    'START_VULNERABILITY_SCAN', 'STOP_VULNERABILITY_SCAN', 'VULNERABILITY_SCAN_COMPLETE', 'VULNERABILITY_SCAN_ERROR',
+    'START_NETWORK_SCAN', 'STOP_NETWORK_SCAN', 'NETWORK_SCAN_COMPLETE', 'NETWORK_SCAN_ERROR'
+  ],
+  'Alerts': ['VULNERABILITY_ACTION_TAKEN', 'VULNERABILITY_MARKED_BENIGN', 'NETWORK_ALERT_ACTION', 'NETWORK_ALERT_BENIGN'],
+  'Reports': ['GENERATE_REPORT', 'EXPORT_REPORT', 'DOWNLOAD_REPORT', 'SHARE_REPORT'],
+  'System': ['PAGE_VIEW', 'EXPORT_LOGS', 'CLEAR_LOGS']
+};
 
 export default function AdminLogs() {
   const navigate = useNavigate();
@@ -49,6 +102,7 @@ export default function AdminLogs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAction, setSelectedAction] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [dateRange, setDateRange] = useState<{
     start: string;
     end: string;
@@ -80,6 +134,11 @@ export default function AdminLogs() {
       log.details.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesAction = !selectedAction || log.action === selectedAction;
+    
+    const matchesCategory = !selectedCategory || 
+      Object.entries(actionCategories).find(([category, actions]) => 
+        category === selectedCategory && actions.includes(log.action)
+      );
 
     const logDate = new Date(log.timestamp);
     const matchesDateRange = (
@@ -87,7 +146,7 @@ export default function AdminLogs() {
       (!dateRange.end || logDate <= new Date(dateRange.end))
     );
 
-    return matchesSearch && matchesAction && matchesDateRange;
+    return matchesSearch && matchesAction && matchesCategory && matchesDateRange;
   });
 
   const handleExport = () => {
@@ -134,6 +193,16 @@ export default function AdminLogs() {
     }
   };
 
+  const getActionColor = (action: string): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" => {
+    if (action.includes('ERROR') || action.includes('DELETE')) return 'error';
+    if (action.includes('CREATE') || action.includes('ADD')) return 'success';
+    if (action.includes('UPDATE') || action.includes('EDIT')) return 'warning';
+    if (action.includes('SCAN')) return 'info';
+    if (action.includes('LOGIN') || action.includes('REGISTER')) return 'primary';
+    if (action.includes('ALERT')) return 'secondary';
+    return 'default';
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
@@ -176,19 +245,36 @@ export default function AdminLogs() {
         />
 
         <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel>Category</InputLabel>
+          <Select
+            value={selectedCategory}
+            onChange={(e) => {
+              setSelectedCategory(e.target.value);
+              setSelectedAction(''); // Reset action when category changes
+            }}
+            label="Category"
+          >
+            <MenuItem value="">All Categories</MenuItem>
+            {Object.keys(actionCategories).map(category => (
+              <MenuItem key={category} value={category}>
+                {category}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl sx={{ minWidth: 200 }}>
           <InputLabel>Action Type</InputLabel>
           <Select
             value={selectedAction}
             onChange={(e) => setSelectedAction(e.target.value)}
             label="Action Type"
-            startAdornment={
-              <InputAdornment position="start">
-                <FilterIcon />
-              </InputAdornment>
-            }
           >
             <MenuItem value="">All Actions</MenuItem>
-            {actionTypes.map(action => (
+            {(selectedCategory 
+              ? actionCategories[selectedCategory as keyof typeof actionCategories] 
+              : actionTypes
+            ).map(action => (
               <MenuItem key={action} value={action}>
                 {action.replace(/_/g, ' ')}
               </MenuItem>
@@ -235,13 +321,9 @@ export default function AdminLogs() {
                 <TableCell>
                   <Chip
                     label={log.action.replace(/_/g, ' ')}
-                    color={
-                      log.action.includes('DELETE') ? 'error' :
-                      log.action.includes('CREATE') ? 'success' :
-                      log.action.includes('UPDATE') ? 'warning' :
-                      'default'
-                    }
+                    color={getActionColor(log.action)}
                     size="small"
+                    sx={{ minWidth: 120 }}
                   />
                 </TableCell>
                 <TableCell>{log.details}</TableCell>
