@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box } from '@mui/material';
 import Dashboard from './pages/Dashboard';
@@ -19,60 +19,24 @@ import AddDomainUser from './pages/admin/AddDomainUser';
 import AdminLogs from './pages/admin/AdminLogs';
 import ConfirmAccount from './pages/ConfirmAccount';
 import RoleManagement from './pages/RoleManagement';
+import { createAppTheme } from './theme';
 
 const DRAWER_WIDTH = 240;
 
 function App() {
-  // Initialize darkMode from localStorage or default to true
-  const [darkMode, setDarkMode] = useState(() => {
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
     const savedMode = localStorage.getItem('darkMode');
-    return savedMode !== null ? JSON.parse(savedMode) : true;
+    return savedMode ? JSON.parse(savedMode) : false;
   });
 
-  // Save darkMode to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  const theme = createTheme({
-    palette: {
-      mode: darkMode ? 'dark' : 'light',
-      primary: {
-        main: '#2196f3',
-      },
-      secondary: {
-        main: '#f50057',
-      },
-      background: {
-        default: darkMode ? '#0a1929' : '#f5f5f5',
-        paper: darkMode ? '#1a2027' : '#ffffff',
-      },
-    },
-    components: {
-      MuiAppBar: {
-        styleOverrides: {
-          root: {
-            zIndex: 1300,
-            boxShadow: 'none',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-          },
-        },
-      },
-      MuiDrawer: {
-        styleOverrides: {
-          paper: {
-            backgroundColor: darkMode ? '#1a2027' : '#ffffff',
-            borderRight: '1px solid',
-            borderColor: 'divider',
-          },
-        },
-      },
-    },
-  });
+  const theme = useMemo(() => createAppTheme(darkMode), [darkMode]);
 
   const handleThemeChange = () => {
-    setDarkMode((prev) => !prev);
+    setDarkMode(!darkMode);
   };
 
   const isAdminRoute = (path: string) => {
