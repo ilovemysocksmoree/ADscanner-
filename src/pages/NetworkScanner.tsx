@@ -25,6 +25,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  MenuItem,
 } from '@mui/material';
 import {
   Computer as ComputerIcon,
@@ -812,13 +813,13 @@ export default function NetworkScanner() {
 
       <TabPanel value={selectedTab} index={2}>
         <Grid container spacing={3}>
-          <Grid item xs={12} lg={6}>
-            <Paper sx={{ p: 3 }}>
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3, mb: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" gutterBottom>
-                  Endpoint Traffic Analysis
+                  Network Traffic Overview
                 </Typography>
-                <Tooltip title="Real-time traffic analysis for each endpoint">
+                <Tooltip title="Comprehensive view of network traffic patterns">
                   <IconButton size="small" sx={{ ml: 1 }}>
                     <InfoIcon />
                   </IconButton>
@@ -826,43 +827,255 @@ export default function NetworkScanner() {
               </Box>
               <Box sx={{ height: 400 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analysisResults.endpoints}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="ip" />
-                    <YAxis />
-                    <RechartsTooltip />
-                    <Legend />
-                    <Bar 
+                  <LineChart data={analysisResults.endpoints}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                    <XAxis 
+                      dataKey="ip" 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                    />
+                    <YAxis 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                    />
+                    <RechartsTooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: 'none',
+                        borderRadius: '4px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Legend 
+                      verticalAlign="top" 
+                      height={36}
+                      iconType="circle"
+                    />
+                    <Line 
+                      type="monotone" 
                       dataKey="packetsIn" 
-                      name="Packets In" 
-                      fill="#8884d8"
+                      name="Inbound Packets"
+                      stroke="#4CAF50"
+                      strokeWidth={2}
+                      dot={{ fill: '#4CAF50', strokeWidth: 2 }}
+                      activeDot={{ r: 6 }}
                       isAnimationActive={true}
                       animationBegin={0}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
+                      animationDuration={1500}
+                      animationEasing="ease-in-out"
                     />
-                    <Bar 
+                    <Line 
+                      type="monotone" 
                       dataKey="packetsOut" 
-                      name="Packets Out" 
-                      fill="#82ca9d"
+                      name="Outbound Packets"
+                      stroke="#2196F3"
+                      strokeWidth={2}
+                      dot={{ fill: '#2196F3', strokeWidth: 2 }}
+                      activeDot={{ r: 6 }}
                       isAnimationActive={true}
                       animationBegin={200}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
+                      animationDuration={1500}
+                      animationEasing="ease-in-out"
                     />
-                  </BarChart>
+                  </LineChart>
                 </ResponsiveContainer>
               </Box>
             </Paper>
           </Grid>
 
-          <Grid item xs={12} lg={6}>
+          <Grid item xs={12} lg={8}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="h6" gutterBottom>
+                    Data Transfer Analysis
+                  </Typography>
+                  <Tooltip title="Detailed view of data transfer patterns">
+                    <IconButton size="small" sx={{ ml: 1 }}>
+                      <InfoIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <TextField
+                    select
+                    size="small"
+                    label="Time Range"
+                    value="1h"
+                    sx={{ minWidth: 120 }}
+                  >
+                    <MenuItem value="1h">Last Hour</MenuItem>
+                    <MenuItem value="6h">Last 6 Hours</MenuItem>
+                    <MenuItem value="24h">Last 24 Hours</MenuItem>
+                    <MenuItem value="7d">Last 7 Days</MenuItem>
+                  </TextField>
+                  <TextField
+                    select
+                    size="small"
+                    label="Top IPs"
+                    value="10"
+                    sx={{ minWidth: 120 }}
+                  >
+                    <MenuItem value="10">Top 10</MenuItem>
+                    <MenuItem value="20">Top 20</MenuItem>
+                    <MenuItem value="50">Top 50</MenuItem>
+                    <MenuItem value="100">Top 100</MenuItem>
+                  </TextField>
+                  <TextField
+                    select
+                    size="small"
+                    label="Group By"
+                    value="ip"
+                    sx={{ minWidth: 120 }}
+                  >
+                    <MenuItem value="ip">IP Address</MenuItem>
+                    <MenuItem value="subnet">Subnet</MenuItem>
+                    <MenuItem value="department">Department</MenuItem>
+                    <MenuItem value="location">Location</MenuItem>
+                  </TextField>
+                </Box>
+              </Box>
+
+              <Box sx={{ height: 400 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={analysisResults.endpoints}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <defs>
+                      <linearGradient id="inboundGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8E24AA" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#8E24AA" stopOpacity={0.1}/>
+                      </linearGradient>
+                      <linearGradient id="outboundGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00ACC1" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#00ACC1" stopOpacity={0.1}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid 
+                      strokeDasharray="3 3" 
+                      stroke="#eee" 
+                      vertical={false}
+                    />
+                    <XAxis 
+                      dataKey="ip"
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                      axisLine={{ stroke: '#eee' }}
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                      tickFormatter={(value) => `${(value / 1024 / 1024).toFixed(1)} MB`}
+                      axisLine={{ stroke: '#eee' }}
+                    />
+                    <RechartsTooltip
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                      }}
+                      formatter={(value: number) => [`${(value / 1024 / 1024).toFixed(2)} MB`, '']}
+                      labelStyle={{ color: '#666' }}
+                    />
+                    <Legend 
+                      verticalAlign="top" 
+                      height={36}
+                      iconType="circle"
+                      wrapperStyle={{
+                        paddingBottom: '20px'
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="bytesIn" 
+                      name="Inbound Data"
+                      stroke="#8E24AA"
+                      strokeWidth={2}
+                      fill="url(#inboundGradient)"
+                      isAnimationActive={true}
+                      animationBegin={0}
+                      animationDuration={1500}
+                      animationEasing="ease-in-out"
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="bytesOut" 
+                      name="Outbound Data"
+                      stroke="#00ACC1"
+                      strokeWidth={2}
+                      fill="url(#outboundGradient)"
+                      isAnimationActive={true}
+                      animationBegin={200}
+                      animationDuration={1500}
+                      animationEasing="ease-in-out"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Box>
+
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Quick Stats
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Total Active IPs
+                      </Typography>
+                      <Typography variant="h6">
+                        2,547
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Peak Traffic
+                      </Typography>
+                      <Typography variant="h6">
+                        847 MB/s
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Active Subnets
+                      </Typography>
+                      <Typography variant="h6">
+                        18
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Anomaly Score
+                      </Typography>
+                      <Typography variant="h6" color="success.main">
+                        Low
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Box>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} lg={4}>
             <Paper sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" gutterBottom>
-                  Bytes Transferred
+                  Traffic Distribution
                 </Typography>
-                <Tooltip title="Real-time bytes transferred for each endpoint">
+                <Tooltip title="Distribution of network traffic across endpoints">
                   <IconButton size="small" sx={{ ml: 1 }}>
                     <InfoIcon />
                   </IconButton>
@@ -870,31 +1083,43 @@ export default function NetworkScanner() {
               </Box>
               <Box sx={{ height: 400 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analysisResults.endpoints}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="ip" />
-                    <YAxis />
-                    <RechartsTooltip />
-                    <Legend />
-                    <Bar 
-                      dataKey="bytesIn" 
-                      name="Bytes In" 
-                      fill="#ffc658"
+                  <PieChart>
+                    <Pie
+                      data={analysisResults.endpoints.map(endpoint => ({
+                        name: endpoint.ip,
+                        value: endpoint.bytesIn + endpoint.bytesOut
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="value"
                       isAnimationActive={true}
                       animationBegin={0}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
+                      animationDuration={1500}
+                      animationEasing="ease-in-out"
+                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      labelLine={false}
+                    >
+                      {analysisResults.endpoints.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={COLORS[index % COLORS.length]}
+                          strokeWidth={2}
+                        />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: 'none',
+                        borderRadius: '4px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                      formatter={(value) => `${(value / 1024).toFixed(2)} KB`}
                     />
-                    <Bar 
-                      dataKey="bytesOut" 
-                      name="Bytes Out" 
-                      fill="#ff7300"
-                      isAnimationActive={true}
-                      animationBegin={200}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
-                    />
-                  </BarChart>
+                  </PieChart>
                 </ResponsiveContainer>
               </Box>
             </Paper>
@@ -904,7 +1129,7 @@ export default function NetworkScanner() {
             <Paper sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" gutterBottom>
-                  Detailed Endpoint Statistics
+                  Detailed Statistics
                 </Typography>
                 <Tooltip title="Comprehensive endpoint traffic statistics">
                   <IconButton size="small" sx={{ ml: 1 }}>
@@ -916,13 +1141,13 @@ export default function NetworkScanner() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>IP Address</TableCell>
-                      <TableCell align="right">Packets In</TableCell>
-                      <TableCell align="right">Packets Out</TableCell>
-                      <TableCell align="right">Bytes In</TableCell>
-                      <TableCell align="right">Bytes Out</TableCell>
-                      <TableCell align="right">Total Traffic</TableCell>
-                      <TableCell>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>IP Address</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Packets In</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Packets Out</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Data In</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Data Out</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total Traffic</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -930,13 +1155,16 @@ export default function NetworkScanner() {
                       const totalBytes = endpoint.bytesIn + endpoint.bytesOut;
                       const isHighTraffic = totalBytes > 300000;
                       return (
-                        <TableRow key={endpoint.ip}>
-                          <TableCell>{endpoint.ip}</TableCell>
+                        <TableRow 
+                          key={endpoint.ip}
+                          sx={{ '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
+                        >
+                          <TableCell sx={{ fontWeight: 500 }}>{endpoint.ip}</TableCell>
                           <TableCell align="right">{endpoint.packetsIn.toLocaleString()}</TableCell>
                           <TableCell align="right">{endpoint.packetsOut.toLocaleString()}</TableCell>
-                          <TableCell align="right">{endpoint.bytesIn.toLocaleString()}</TableCell>
-                          <TableCell align="right">{endpoint.bytesOut.toLocaleString()}</TableCell>
-                          <TableCell align="right">
+                          <TableCell align="right">{(endpoint.bytesIn / 1024).toFixed(2)} KB</TableCell>
+                          <TableCell align="right">{(endpoint.bytesOut / 1024).toFixed(2)} KB</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 500 }}>
                             {(totalBytes / 1024).toFixed(2)} KB
                           </TableCell>
                           <TableCell>
@@ -944,6 +1172,11 @@ export default function NetworkScanner() {
                               size="small"
                               color={isHighTraffic ? 'warning' : 'success'}
                               label={isHighTraffic ? 'High Traffic' : 'Normal'}
+                              sx={{ 
+                                fontWeight: 500,
+                                minWidth: 85,
+                                '& .MuiChip-label': { px: 2 }
+                              }}
                             />
                           </TableCell>
                         </TableRow>
