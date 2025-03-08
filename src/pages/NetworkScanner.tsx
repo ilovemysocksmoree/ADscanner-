@@ -14,12 +14,30 @@ import {
   CircularProgress,
   Chip,
   Snackbar,
+  Tabs,
+  Tab,
+  ToggleButton,
+  Tooltip,
+  IconButton,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
 } from '@mui/material';
 import {
   Computer as ComputerIcon,
   Router as RouterIcon,
   PlayArrow as StartIcon,
   Stop as StopIcon,
+  Upload as UploadIcon,
+  Assessment as AssessmentIcon,
+  NetworkCheck as NetworkCheckIcon,
+  Apps as AppsIcon,
+  Info as InfoIcon,
+  LightMode as LightModeIcon,
+  DarkMode as DarkModeIcon,
 } from '@mui/icons-material';
 import {
   BarChart,
@@ -42,23 +60,29 @@ import AlertBar from '../components/AlertBar';
 import { useAuth } from '../contexts/AuthContext';
 import { loggingService } from '../services/LoggingService';
 import { styled } from '@mui/material/styles';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-} from 'recharts';
 import { HeatMapGrid } from 'react-grid-heatmap';
+
+// Constants
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
+// Mock data for analysis
+const mockProtocolData = [
+  { protocol: 'TCP', count: 1250, percentage: 45 },
+  { protocol: 'UDP', count: 850, percentage: 30 },
+  { protocol: 'ICMP', count: 400, percentage: 15 },
+  { protocol: 'Other', count: 280, percentage: 10 },
+];
+
+const mockEndpointData = [
+  { ip: '192.168.1.100', packetsIn: 2500, packetsOut: 1800, bytesIn: 250000, bytesOut: 180000 },
+  { ip: '192.168.1.101', packetsIn: 1500, packetsOut: 1200, bytesIn: 150000, bytesOut: 120000 },
+];
+
+const mockAppData = [
+  { application: 'HTTP/HTTPS', connections: 450, bytesTransferred: 500000 },
+  { application: 'DNS', connections: 250, bytesTransferred: 25000 },
+  { application: 'SMB', connections: 150, bytesTransferred: 300000 },
+];
 
 interface NetworkDevice {
   ip: string;
@@ -164,6 +188,39 @@ const mockNetworkAlerts: NetworkAlert[] = [
   },
 ];
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`network-tabpanel-${index}`}
+      aria-labelledby={`network-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `network-tab-${index}`,
+    'aria-controls': `network-tabpanel-${index}`,
+  };
+}
+
 export default function NetworkScanner() {
   const { user } = useAuth();
   const [networkRange, setNetworkRange] = useState('192.168.1.0/24');
@@ -172,6 +229,39 @@ export default function NetworkScanner() {
   const [alerts, setAlerts] = useState<NetworkAlert[]>(mockNetworkAlerts);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [selectedTab, setSelectedTab] = useState(0);
+  const [darkMode, setDarkMode] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showDetailedResults, setShowDetailedResults] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
+  const [analysisDetails, setAnalysisDetails] = useState<AnalysisDetails | null>(null);
+  const [analysisResults, setAnalysisResults] = useState({
+    protocols: mockProtocolData,
+    endpoints: mockEndpointData,
+    applications: mockAppData,
+  });
+  const [protocolTimeData, setProtocolTimeData] = useState([
+    { time: '00:00', TCP: 120, UDP: 80, ICMP: 30 },
+    { time: '04:00', TCP: 180, UDP: 150, ICMP: 45 },
+    { time: '08:00', TCP: 350, UDP: 280, ICMP: 90 },
+    { time: '12:00', TCP: 420, UDP: 380, ICMP: 120 },
+    { time: '16:00', TCP: 280, UDP: 250, ICMP: 75 },
+    { time: '20:00', TCP: 160, UDP: 120, ICMP: 40 },
+  ]);
+  const [applicationTimeData, setApplicationTimeData] = useState([
+    { time: '00:00', HTTP: 120, DNS: 80, SMB: 30 },
+    { time: '04:00', HTTP: 180, DNS: 150, SMB: 45 },
+    { time: '08:00', HTTP: 350, DNS: 280, SMB: 90 },
+    { time: '12:00', HTTP: 420, DNS: 380, SMB: 120 },
+    { time: '16:00', HTTP: 280, DNS: 250, SMB: 75 },
+    { time: '20:00', HTTP: 160, DNS: 120, SMB: 40 },
+  ]);
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setSelectedTab(newValue);
+  };
 
   const handleStartScan = () => {
     setIsScanning(true);
@@ -405,6 +495,49 @@ export default function NetworkScanner() {
     }
   };
 
+  // Add interval for real-time updates
+  useEffect(() => {
+    if (isAnalyzing) {
+      const interval = setInterval(() => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+        
+        setProtocolTimeData(prev => {
+          const newData = [...prev.slice(1), {
+            time: timeStr,
+            TCP: Math.floor(Math.random() * 300) + 100,
+            UDP: Math.floor(Math.random() * 200) + 50,
+            ICMP: Math.floor(Math.random() * 100) + 20,
+          }];
+          return newData;
+        });
+      }, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isAnalyzing]);
+
+  useEffect(() => {
+    if (isAnalyzing) {
+      const interval = setInterval(() => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+        
+        setApplicationTimeData(prev => {
+          const newData = [...prev.slice(1), {
+            time: timeStr,
+            HTTP: Math.floor(Math.random() * 300) + 100,
+            DNS: Math.floor(Math.random() * 200) + 50,
+            SMB: Math.floor(Math.random() * 100) + 20,
+          }];
+          return newData;
+        });
+      }, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isAnalyzing]);
+
   return (
     <Box sx={{ flexGrow: 1 }}>
       {/* Header with Dark Mode Toggle */}
@@ -443,7 +576,7 @@ export default function NetworkScanner() {
       </Box>
 
       <TabPanel value={selectedTab} index={0}>
-        {/* Existing Network Scan Configuration */}
+        {/* Network Scan Configuration */}
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Paper sx={{ p: 3 }}>
@@ -476,67 +609,516 @@ export default function NetworkScanner() {
             </Paper>
           </Grid>
 
-        {/* Scan Results */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Discovered Devices
-            </Typography>
-            {isScanning ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                <CircularProgress />
-              </Box>
-            ) : (
-              <List>
-                {devices.map((device, index) => (
-                  <div key={device.ip}>
-                    <ListItem>
-                      <ListItemIcon>
-                        {device.type === 'router' ? (
-                          <RouterIcon color="primary" />
-                        ) : (
-                          <ComputerIcon color="primary" />
-                        )}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle1">{device.hostname}</Typography>
-                            <Chip
-                              label={device.ip}
-                              size="small"
-                              variant="outlined"
-                            />
-                          </Box>
-                        }
-                        secondary={
-                          <Box sx={{ mt: 1 }}>
-                            <Typography variant="subtitle2" gutterBottom>
-                              Open Services:
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                              {device.services.map((service) => (
-                                <Chip
-                                  key={service.port}
-                                  label={`${service.name} (${service.port})`}
-                                  size="small"
-                                  color="primary"
-                                  variant="outlined"
-                                />
-                              ))}
+          {/* Scan Results */}
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Discovered Devices
+              </Typography>
+              {isScanning ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <List>
+                  {devices.map((device, index) => (
+                    <div key={device.ip}>
+                      <ListItem>
+                        <ListItemIcon>
+                          {device.type === 'router' ? (
+                            <RouterIcon color="primary" />
+                          ) : (
+                            <ComputerIcon color="primary" />
+                          )}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="subtitle1">{device.hostname}</Typography>
+                              <Chip label={device.ip} size="small" variant="outlined" />
                             </Box>
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                    {index < devices.length - 1 && <Divider />}
-                  </div>
-                ))}
-              </List>
-            )}
-          </Paper>
+                          }
+                          secondary={
+                            <Box sx={{ mt: 1 }}>
+                              <Typography variant="subtitle2" gutterBottom>
+                                Open Services:
+                              </Typography>
+                              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                {device.services.map((service) => (
+                                  <Chip
+                                    key={service.port}
+                                    label={`${service.name} (${service.port})`}
+                                    size="small"
+                                    color="primary"
+                                    variant="outlined"
+                                  />
+                                ))}
+                              </Box>
+                            </Box>
+                          }
+                        />
+                      </ListItem>
+                      {index < devices.length - 1 && <Divider />}
+                    </div>
+                  ))}
+                </List>
+              )}
+            </Paper>
+          </Grid>
         </Grid>
-      </Grid>
+      </TabPanel>
+
+      <TabPanel value={selectedTab} index={1}>
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                PCAP File Analysis
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<UploadIcon />}
+                    sx={{ mr: 2 }}
+                  >
+                    Upload PCAP File
+                    <input
+                      type="file"
+                      hidden
+                      accept=".pcap,.pcapng"
+                      onChange={handleFileUpload}
+                    />
+                  </Button>
+                  {file && (
+                    <Button
+                      variant="contained"
+                      onClick={handleAnalyzeFile}
+                      disabled={isAnalyzing}
+                      startIcon={isAnalyzing ? <CircularProgress size={20} /> : <AssessmentIcon />}
+                    >
+                      {isAnalyzing ? 'Analyzing...' : 'Analyze File'}
+                    </Button>
+                  )}
+                </Grid>
+              </Grid>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} lg={6}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Protocol Distribution
+                </Typography>
+                <Tooltip title="Real-time distribution of network protocols">
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <InfoIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Box sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={analysisResults.protocols}
+                      dataKey="count"
+                      nameKey="protocol"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      isAnimationActive={true}
+                      animationBegin={0}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    >
+                      {analysisResults.protocols.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} lg={6}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Protocol Traffic Over Time
+                </Typography>
+                <Tooltip title="Real-time view of protocol traffic">
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <InfoIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Box sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={protocolTimeData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="time"
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis />
+                    <RechartsTooltip />
+                    <Legend />
+                    <Area 
+                      type="monotone" 
+                      dataKey="TCP" 
+                      stackId="1" 
+                      stroke="#8884d8" 
+                      fill="#8884d8"
+                      isAnimationActive={true}
+                      animationBegin={0}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="UDP" 
+                      stackId="1" 
+                      stroke="#82ca9d" 
+                      fill="#82ca9d"
+                      isAnimationActive={true}
+                      animationBegin={200}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="ICMP" 
+                      stackId="1" 
+                      stroke="#ffc658" 
+                      fill="#ffc658"
+                      isAnimationActive={true}
+                      animationBegin={400}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      </TabPanel>
+
+      <TabPanel value={selectedTab} index={2}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} lg={6}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Endpoint Traffic Analysis
+                </Typography>
+                <Tooltip title="Real-time traffic analysis for each endpoint">
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <InfoIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Box sx={{ height: 400 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analysisResults.endpoints}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="ip" />
+                    <YAxis />
+                    <RechartsTooltip />
+                    <Legend />
+                    <Bar 
+                      dataKey="packetsIn" 
+                      name="Packets In" 
+                      fill="#8884d8"
+                      isAnimationActive={true}
+                      animationBegin={0}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                    <Bar 
+                      dataKey="packetsOut" 
+                      name="Packets Out" 
+                      fill="#82ca9d"
+                      isAnimationActive={true}
+                      animationBegin={200}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} lg={6}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Bytes Transferred
+                </Typography>
+                <Tooltip title="Real-time bytes transferred for each endpoint">
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <InfoIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Box sx={{ height: 400 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analysisResults.endpoints}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="ip" />
+                    <YAxis />
+                    <RechartsTooltip />
+                    <Legend />
+                    <Bar 
+                      dataKey="bytesIn" 
+                      name="Bytes In" 
+                      fill="#ffc658"
+                      isAnimationActive={true}
+                      animationBegin={0}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                    <Bar 
+                      dataKey="bytesOut" 
+                      name="Bytes Out" 
+                      fill="#ff7300"
+                      isAnimationActive={true}
+                      animationBegin={200}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Detailed Endpoint Statistics
+                </Typography>
+                <Tooltip title="Comprehensive endpoint traffic statistics">
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <InfoIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>IP Address</TableCell>
+                      <TableCell align="right">Packets In</TableCell>
+                      <TableCell align="right">Packets Out</TableCell>
+                      <TableCell align="right">Bytes In</TableCell>
+                      <TableCell align="right">Bytes Out</TableCell>
+                      <TableCell align="right">Total Traffic</TableCell>
+                      <TableCell>Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {analysisResults.endpoints.map((endpoint) => {
+                      const totalBytes = endpoint.bytesIn + endpoint.bytesOut;
+                      const isHighTraffic = totalBytes > 300000;
+                      return (
+                        <TableRow key={endpoint.ip}>
+                          <TableCell>{endpoint.ip}</TableCell>
+                          <TableCell align="right">{endpoint.packetsIn.toLocaleString()}</TableCell>
+                          <TableCell align="right">{endpoint.packetsOut.toLocaleString()}</TableCell>
+                          <TableCell align="right">{endpoint.bytesIn.toLocaleString()}</TableCell>
+                          <TableCell align="right">{endpoint.bytesOut.toLocaleString()}</TableCell>
+                          <TableCell align="right">
+                            {(totalBytes / 1024).toFixed(2)} KB
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              color={isHighTraffic ? 'warning' : 'success'}
+                              label={isHighTraffic ? 'High Traffic' : 'Normal'}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Grid>
+        </Grid>
+      </TabPanel>
+
+      <TabPanel value={selectedTab} index={3}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} lg={6}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Application Layer Traffic
+                </Typography>
+                <Tooltip title="Real-time application protocol usage">
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <InfoIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Box sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={applicationTimeData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="time"
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis />
+                    <RechartsTooltip />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="HTTP" 
+                      stroke="#8884d8"
+                      isAnimationActive={true}
+                      animationBegin={0}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                      dot={false}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="DNS" 
+                      stroke="#82ca9d"
+                      isAnimationActive={true}
+                      animationBegin={200}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                      dot={false}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="SMB" 
+                      stroke="#ffc658"
+                      isAnimationActive={true}
+                      animationBegin={400}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                      dot={false}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="FTP" 
+                      stroke="#ff7300"
+                      isAnimationActive={true}
+                      animationBegin={600}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} lg={6}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Application Distribution
+                </Typography>
+                <Tooltip title="Distribution of application protocols">
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <InfoIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Box sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={analysisResults.applications}
+                      dataKey="bytesTransferred"
+                      nameKey="application"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      isAnimationActive={true}
+                      animationBegin={0}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    >
+                      {analysisResults.applications.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Application Layer Statistics
+                </Typography>
+                <Tooltip title="Detailed application protocol statistics">
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <InfoIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Application</TableCell>
+                      <TableCell align="right">Connections</TableCell>
+                      <TableCell align="right">Bytes Transferred</TableCell>
+                      <TableCell align="right">% of Total Traffic</TableCell>
+                      <TableCell>Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {analysisResults.applications.map((app) => {
+                      const totalBytes = analysisResults.applications.reduce((acc, curr) => acc + curr.bytesTransferred, 0);
+                      const percentage = ((app.bytesTransferred / totalBytes) * 100).toFixed(1);
+                      const isHighUsage = app.connections > 300;
+                      return (
+                        <TableRow key={app.application}>
+                          <TableCell>{app.application}</TableCell>
+                          <TableCell align="right">{app.connections.toLocaleString()}</TableCell>
+                          <TableCell align="right">{(app.bytesTransferred / 1024).toFixed(2)} KB</TableCell>
+                          <TableCell align="right">{percentage}%</TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              color={isHighUsage ? 'warning' : 'success'}
+                              label={isHighUsage ? 'High Usage' : 'Normal'}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Grid>
+        </Grid>
+      </TabPanel>
 
       <Snackbar
         open={snackbarOpen}
