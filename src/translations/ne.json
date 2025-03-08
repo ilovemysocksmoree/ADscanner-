@@ -1,0 +1,33 @@
+{
+  "common": {
+    "securityDashboard": "सुरक्षा ड्यासबोर्ड",
+    "profile": "प्रोफाइल",
+    "myAccount": "मेरो खाता",
+    "logout": "लग आउट",
+    "language": "भाषा"
+  },
+  "nav": {
+    "dashboard": "ड्यासबोर्ड",
+    "vulnerabilityScanner": "भेद्यता स्क्यानर",
+    "networkScanner": "नेटवर्क स्क्यानर",
+    "reports": "रिपोर्टहरू",
+    "settings": "सेटिङहरू"
+  },
+  "settings": {
+    "automaticScanning": "स्वचालित स्क्यानिङ",
+    "scanDescription": "आवधिक रूपमा भेद्यताहरू स्क्यान गर्नुहोस्",
+    "pushNotifications": "पुश सूचनाहरू",
+    "notificationDescription": "सुरक्षा घटनाहरूको लागि सूचनाहरू प्राप्त गर्नुहोस्",
+    "realTimeUpdates": "रियल-टाइम अपडेटहरू",
+    "updatesDescription": "लाइभ अनुगमन र सूचनाहरू",
+    "scanConfiguration": "स्क्यान कन्फिगरेसन",
+    "configDescription": "स्क्यान अन्तरालहरू र लक्ष्यहरू सेट गर्नुहोस्"
+  },
+  "notifications": {
+    "history": "सूचना इतिहास",
+    "criticalVulnerability": "महत्वपूर्ण भेद्यता",
+    "networkAnomaly": "नेटवर्क एनोमली",
+    "executionDetected": "रिमोट कोड एक्जिक्युसन भेद्यता पत्ता लागेको छ",
+    "trafficPattern": "असामान्य ट्राफिक प्याटर्न पत्ता लागेको छ"
+  }
+} 
