@@ -62,6 +62,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { loggingService } from '../services/LoggingService';
 import { styled } from '@mui/material/styles';
 import { HeatMapGrid } from 'react-grid-heatmap';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 
 // Constants
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
