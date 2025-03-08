@@ -910,10 +910,6 @@ export default function Reports() {
         p: 3
       }}
     >
-      <Typography variant="h4" gutterBottom sx={{ color: 'text.primary' }}>
-        Reports Dashboard
-      </Typography>
-
       <Paper sx={{ mb: 3 }}>
         <Tabs 
           value={currentTab} 
