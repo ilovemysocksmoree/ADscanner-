@@ -590,13 +590,135 @@ export default function Reports() {
   const handleExport = () => {
     if (!selectedReport) return;
 
+    const generateExecutiveSummary = (report: ScanReport) => {
+      return {
+        overview: `Security assessment conducted on ${report.date} revealed ${report.findings} findings of varying severity levels.`,
+        riskLevel: report.severity,
+        keyFindings: [
+          `${report.details.vulnerabilities} vulnerabilities identified`,
+          `Network security score: ${report.details.securityScore}/100`,
+          `System performance impact: ${report.details.performanceMetrics.responseTime}ms average response time`
+        ],
+        recommendations: [
+          "Implement immediate patching for critical vulnerabilities",
+          "Enhance network segmentation",
+          "Update security policies and procedures"
+        ]
+      };
+    };
+
+    const generateDetailedAnalysis = (report: ScanReport) => {
+      return {
+        vulnerabilityBreakdown: {
+          critical: report.severity === 'critical' ? report.findings : 0,
+          high: report.severity === 'high' ? report.findings : 0,
+          medium: report.severity === 'medium' ? report.findings : 0,
+          low: report.severity === 'low' ? report.findings : 0
+        },
+        networkAnalysis: {
+          topology: "Detailed network map analysis",
+          exposedServices: ["HTTP", "HTTPS", "SSH", "FTP"],
+          securityMeasures: {
+            firewallStatus: "Active",
+            encryptionProtocols: ["TLS 1.3", "TLS 1.2"],
+            certificateStatus: "Valid"
+          }
+        },
+        systemHealth: {
+          cpuUtilization: "45%",
+          memoryUsage: "60%",
+          diskSpace: "75% available",
+          responseTime: report.details.performanceMetrics.responseTime + "ms",
+          uptime: report.details.performanceMetrics.uptime + "%"
+        }
+      };
+    };
+
+    const generateRemediationPlan = (report: ScanReport) => {
+      return {
+        immediate: [
+          {
+            issue: "Critical vulnerabilities",
+            action: "Apply security patches",
+            timeline: "24 hours",
+            resources: "System administration team"
+          }
+        ],
+        shortTerm: [
+          {
+            issue: "Network security gaps",
+            action: "Implement network segmentation",
+            timeline: "1 week",
+            resources: "Network security team"
+          }
+        ],
+        longTerm: [
+          {
+            issue: "System architecture improvements",
+            action: "Migrate to zero-trust architecture",
+            timeline: "3 months",
+            resources: "Security and DevOps teams"
+          }
+        ]
+      };
+    };
+
+    const generateComplianceAssessment = () => {
+      return {
+        standards: [
+          {
+            name: "ISO 27001",
+            compliance: "85%",
+            gaps: ["Access Control", "Cryptography"],
+            recommendations: ["Implement MFA", "Upgrade encryption protocols"]
+          },
+          {
+            name: "NIST CSF",
+            compliance: "78%",
+            gaps: ["Incident Response", "Recovery Planning"],
+            recommendations: ["Update IR playbooks", "Conduct recovery drills"]
+          },
+          {
+            name: "GDPR",
+            compliance: "92%",
+            gaps: ["Data Processing Records"],
+            recommendations: ["Update processing documentation"]
+          }
+        ]
+      };
+    };
+
     const exportData = {
       ...mockComprehensiveReport,
       generatedReport: {
         id: selectedReport.id,
         timestamp: new Date().toISOString(),
         type: exportFormat,
-        data: selectedReport
+        metadata: {
+          generatedBy: user?.email || 'System',
+          scanTarget: selectedReport.target,
+          scanDuration: "2 hours 15 minutes",
+          toolVersion: "3.5.0"
+        },
+        executiveSummary: generateExecutiveSummary(selectedReport),
+        detailedAnalysis: generateDetailedAnalysis(selectedReport),
+        remediationPlan: generateRemediationPlan(selectedReport),
+        complianceAssessment: generateComplianceAssessment(),
+        appendices: {
+          rawData: selectedReport,
+          scanConfigurations: {
+            scanType: selectedReport.type,
+            targetScope: selectedReport.target,
+            excludedHosts: [],
+            scanPolicy: "Standard security assessment"
+          },
+          toolConfiguration: {
+            version: "3.5.0",
+            modules: ["Vulnerability Scanner", "Network Analyzer", "Compliance Checker"],
+            signatures: "Latest (2024-03-20)",
+            customRules: []
+          }
+        }
       }
     };
 
@@ -605,38 +727,63 @@ export default function Reports() {
     let mimeType: string;
     let fileExtension: string;
 
+    const formatReport = (data: any) => {
+      switch (exportFormat) {
+        case 'pdf':
+          // In a real implementation, you would use a PDF generation library
+          return JSON.stringify(data, null, 2);
+        case 'doc':
+          // Structure content for Word document
+          return JSON.stringify(data, null, 2);
+        case 'json':
+          return JSON.stringify(data, null, 2);
+        case 'csv':
+          // Convert the data to CSV format with detailed sections
+          const csvRows = [
+            'Section,Category,Finding,Severity,Details'
+          ];
+          
+          // Add vulnerability breakdown
+          Object.entries(data.generatedReport.detailedAnalysis.vulnerabilityBreakdown)
+            .forEach(([severity, count]) => {
+              csvRows.push(`Vulnerabilities,${severity},Count,${count},Impact: ${severity === 'critical' ? 'Immediate action required' : 'Action required'}`);
+            });
+          
+          // Add remediation plans
+          data.generatedReport.remediationPlan.immediate
+            .forEach(item => {
+              csvRows.push(`Remediation,Immediate,${item.issue},Critical,${item.action}, Timeline: ${item.timeline}`);
+            });
+          
+          return csvRows.join('\n');
+        default:
+          return JSON.stringify(data, null, 2);
+      }
+    };
+
     switch (exportFormat) {
       case 'pdf':
-        // In a real implementation, you would use a PDF generation library
-        content = JSON.stringify(exportData, null, 2);
+        content = formatReport(exportData);
         mimeType = 'application/pdf';
         fileExtension = 'pdf';
         break;
       case 'doc':
-        content = JSON.stringify(exportData, null, 2);
+        content = formatReport(exportData);
         mimeType = 'application/msword';
         fileExtension = 'doc';
         break;
       case 'json':
-        content = JSON.stringify(exportData, null, 2);
+        content = formatReport(exportData);
         mimeType = 'application/json';
         fileExtension = 'json';
         break;
       case 'csv':
-        // Convert the data to CSV format
-        const csvContent = [
-          'Section,Content',
-          `Title,${exportData.coverPage.title}`,
-          `Date,${exportData.coverPage.date}`,
-          `Organization,${exportData.coverPage.organization}`,
-          // Add more CSV rows as needed
-        ].join('\n');
-        content = csvContent;
+        content = formatReport(exportData);
         mimeType = 'text/csv';
         fileExtension = 'csv';
         break;
       default:
-        content = JSON.stringify(exportData, null, 2);
+        content = formatReport(exportData);
         mimeType = 'application/json';
         fileExtension = 'json';
     }
@@ -646,7 +793,7 @@ export default function Reports() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `security-report-${new Date().getTime()}.${fileExtension}`;
+    a.download = `security-report-${selectedReport.target}-${new Date().toISOString()}.${fileExtension}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
