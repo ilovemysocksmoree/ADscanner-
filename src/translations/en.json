@@ -1,0 +1,33 @@
+{
+  "common": {
+    "securityDashboard": "Security Dashboard",
+    "profile": "Profile",
+    "myAccount": "My Account",
+    "logout": "Logout",
+    "language": "Language"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "vulnerabilityScanner": "Vulnerability Scanner",
+    "networkScanner": "Network Scanner",
+    "reports": "Reports",
+    "settings": "Settings"
+  },
+  "settings": {
+    "automaticScanning": "Automatic Scanning",
+    "scanDescription": "Periodically scan for vulnerabilities",
+    "pushNotifications": "Push Notifications",
+    "notificationDescription": "Get alerts for security events",
+    "realTimeUpdates": "Real-time Updates",
+    "updatesDescription": "Live monitoring and alerts",
+    "scanConfiguration": "Scan Configuration",
+    "configDescription": "Set scanning intervals and targets"
+  },
+  "notifications": {
+    "history": "Notification History",
+    "criticalVulnerability": "Critical Vulnerability",
+    "networkAnomaly": "Network Anomaly",
+    "executionDetected": "Remote code execution vulnerability detected",
+    "trafficPattern": "Unusual traffic pattern detected"
+  }
+} 
