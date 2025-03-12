@@ -21,6 +21,7 @@ import {
   PersonAdd as PersonAddIcon,
   Assessment as AssessmentIcon,
   AdminPanelSettings as RoleIcon,
+  VerifiedUser as TrustIPIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -30,6 +31,7 @@ const commonNavigationItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/vulnerability-scanner', label: 'Vulnerability Scanner', icon: <SecurityIcon /> },
   { path: '/network-scanner', label: 'Network Scanner', icon: <NetworkIcon /> },
+  { path: '/trust-ip', label: 'TrustIP Analytics', icon: <TrustIPIcon /> },
   { path: '/reports', label: 'Reports', icon: <ReportIcon /> },
 ];
 

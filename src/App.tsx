@@ -20,6 +20,10 @@ import AdminLogs from './pages/admin/AdminLogs';
 import ConfirmAccount from './pages/ConfirmAccount';
 import RoleManagement from './pages/RoleManagement';
 import { createAppTheme } from './theme';
+import TrustIPAnalytics from './pages/TrustIPAnalytics';
+import { ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Link } from 'react-router-dom';
+import SecurityIcon from '@mui/icons-material/Security';
 
 const DRAWER_WIDTH = 240;
 
@@ -138,6 +142,8 @@ function App() {
                           <Route path="/admin/add-domain-user/:userId" element={<AddDomainUser />} />
                           <Route path="/admin/role-management" element={<RoleManagement />} />
                           <Route path="/admin/logs" element={<AdminLogs />} />
+                          
+                          <Route path="/trust-ip" element={<TrustIPAnalytics />} />
                           
                           <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
