@@ -98,6 +98,7 @@ interface NetworkDevice {
   }[];
 }
 
+
 interface NetworkAlert {
   id: string;
   title: string;
@@ -543,18 +544,6 @@ export default function NetworkScanner() {
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      {/* Header with Dark Mode Toggle */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Network Scanner Dashboard</Typography>
-        <ToggleButton
-          value="darkMode"
-          selected={darkMode}
-          onChange={() => setDarkMode(!darkMode)}
-        >
-          {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
-        </ToggleButton>
-      </Box>
-
       {/* Alerts Section */}
       <Box sx={{ mb: 3 }}>
         {alerts.map((alert) => (

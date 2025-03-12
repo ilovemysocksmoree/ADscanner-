@@ -920,7 +920,7 @@ export default function Reports() {
             bgcolor: 'background.paper'
           }}
         >
-          <Tab label="Report Dashboard" icon={<AssessmentIcon />} />
+          <Tab label="Reports" icon={<AssessmentIcon />} />
           <Tab label="Scheduled Reports" icon={<ScheduleIcon />} />
           <Tab label="Analytics" icon={<SecurityIcon />} />
         </Tabs>
