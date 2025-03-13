@@ -37,6 +37,7 @@ import {
   Shield as ShieldIcon,
   Visibility as VisibilityIcon,
   Search as SearchIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import {
   AreaChart,
@@ -92,7 +93,21 @@ interface IPAnalysisResult {
   }[];
 }
 
+interface RecentIP {
+  ip: string;
+  country: string;
+  flag: string;
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#FF4842'];
+
+const INITIAL_RECENT_IPS: RecentIP[] = [
+  { ip: '44.197.185.15', country: 'US', flag: '🇺🇸' },
+  { ip: '31.13.127.3', country: 'IE', flag: '🇮🇪' },
+  { ip: '161.97.118.98', country: 'FR', flag: '🇫🇷' },
+  { ip: '149.28.70.75', country: 'US', flag: '🇺🇸' },
+  { ip: '158.46.166.233', country: 'TH', flag: '🇹🇭' },
+];
 
 const mockAnalysis = (ip: string): Promise<IPAnalysisResult> => {
   return new Promise((resolve) => {
@@ -146,8 +161,8 @@ const RiskScoreGauge = ({ score }: { score: number }) => {
   const rotation = (score / 100) * 180;
   
   return (
-    <Box sx={{ position: 'relative', width: '200px', height: '100px', margin: '0 auto' }}>
-      <svg width="200" height="100" viewBox="0 0 200 100">
+    <Box sx={{ position: 'relative', width: '200px', height: '120px', margin: '0 auto' }}>
+      <svg width="200" height="120" viewBox="0 0 200 120">
         {/* Background arc */}
         <path
           d="M20 80 A 60 60 0 0 1 180 80"
@@ -170,12 +185,15 @@ const RiskScoreGauge = ({ score }: { score: number }) => {
           x="100"
           y="85"
           textAnchor="middle"
-          fontSize="24"
+          fontSize="32"
           fontWeight="bold"
           fill="#333"
         >
           {score}
         </text>
+        {/* Labels */}
+        <text x="30" y="110" fontSize="12" fill="#666">Low</text>
+        <text x="160" y="110" fontSize="12" fill="#666">High</text>
       </svg>
     </Box>
   );
@@ -233,27 +251,15 @@ const SearchButton = styled(IconButton)({
   }
 });
 
-interface RecentIP {
-  ip: string;
-  country: string;
-  flag: string;
-}
-
-const recentIPs: RecentIP[] = [
-  { ip: '44.197.185.15', country: 'US', flag: '🇺🇸' },
-  { ip: '31.13.127.3', country: 'IE', flag: '🇮🇪' },
-  { ip: '161.97.118.98', country: 'FR', flag: '🇫🇷' },
-  { ip: '149.28.70.75', country: 'US', flag: '🇺🇸' },
-  { ip: '158.46.166.233', country: 'TH', flag: '🇹🇭' },
-];
-
 export default function TrustIPAnalytics() {
   const [ipAddress, setIpAddress] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<IPAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recentIPs, setRecentIPs] = useState<RecentIP[]>(INITIAL_RECENT_IPS);
+  const [showAnalysis, setShowAnalysis] = useState(false);
 
-  const handleAnalyze = async () => {
+  const handleSearch = async () => {
     if (!ipAddress) {
       setError('Please enter an IP address');
       return;
@@ -270,16 +276,24 @@ export default function TrustIPAnalytics() {
     try {
       const result = await mockAnalysis(ipAddress);
       setAnalysisResult(result);
+      // Add to recent IPs if not already present
+      const newIP = {
+        ip: ipAddress,
+        country: result.origin.country,
+        flag: getCountryFlag(result.origin.country)
+      };
+      setRecentIPs(prevIPs => {
+        const exists = prevIPs.some(ip => ip.ip === ipAddress);
+        if (!exists) {
+          return [newIP, ...prevIPs.slice(0, 4)];
+        }
+        return prevIPs;
+      });
+      setShowAnalysis(true);
     } catch (err) {
       setError('Failed to analyze IP address');
     } finally {
       setIsAnalyzing(false);
-    }
-  };
-
-  const handleSearch = () => {
-    if (ipAddress) {
-      // Handle search logic
     }
   };
 
@@ -289,480 +303,551 @@ export default function TrustIPAnalytics() {
     }
   };
 
+  // Add helper function for country flags
+  const getCountryFlag = (country: string): string => {
+    const flags: { [key: string]: string } = {
+      'Japan': '🇯🇵',
+      'United States': '🇺🇸',
+      'China': '🇨🇳',
+      'South Korea': '🇰🇷',
+      // Add more countries as needed
+    };
+    return flags[country] || '🌐';
+  };
+
+  if (showAnalysis && analysisResult) {
+    return (
+      <Box sx={{ 
+        minHeight: '100vh',
+        bgcolor: '#fff',
+        p: 3
+      }}>
+        {/* Risk and Origin Section */}
+        <Box sx={{ 
+          bgcolor: '#fff', 
+          borderRadius: 1,
+          mb: 3
+        }}>
+          <Typography variant="h6" sx={{ 
+            color: '#333',
+            fontSize: '1rem',
+            fontWeight: 500,
+            mb: 2
+          }}>
+            Risk and origin
+          </Typography>
+
+          <Grid container spacing={3}>
+            {/* Risk Score */}
+            <Grid item xs={12} md={4}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ 
+                  mb: 1, 
+                  color: '#666',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  fontSize: '0.75rem',
+                  fontWeight: 500
+                }}>
+                  RISK SCORE <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+                </Typography>
+                <RiskScoreGauge score={75} />
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start',
+                  gap: 1,
+                  mt: 2
+                }}>
+                  <InfoIcon sx={{ fontSize: '1rem', color: '#2196f3', mt: 0.3 }} />
+                  <Typography variant="body2" sx={{ 
+                    color: '#666',
+                    fontSize: '0.85rem',
+                    lineHeight: 1.4
+                  }}>
+                    Risk score reason: Low magnitude RCE/RFI, Backdoor/Trojan attacks targeting many customers
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+
+            {/* Origin & Reputation */}
+            <Grid item xs={12} md={8}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ 
+                  mb: 2,
+                  color: '#666',
+                  fontSize: '0.75rem',
+                  fontWeight: 500
+                }}>
+                  ORIGIN
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                        Country
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography>Japan</Typography>
+                        <Typography component="span" sx={{ fontSize: '1.2rem' }}>🇯🇵</Typography>
+                      </Box>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                        City
+                      </Typography>
+                      <Typography>Tokyo</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                        ASN
+                      </Typography>
+                      <Typography>MICROSOFT-CORP-MSN-AS-BLOCK (#8075)</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                        Requests
+                      </Typography>
+                      <Typography>656.3K</Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" sx={{ 
+                    mb: 2,
+                    color: '#666',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5
+                  }}>
+                    REPUTATION <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+                  </Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 1 }}>
+                      Known to use
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Chip 
+                        label="Microsoft" 
+                        sx={{ 
+                          bgcolor: '#e3f2fd',
+                          color: '#1976d2',
+                          height: '24px',
+                          fontSize: '0.75rem',
+                          borderRadius: '4px'
+                        }} 
+                      />
+                      <Chip 
+                        label="Microsoft Azure" 
+                        sx={{ 
+                          bgcolor: '#e3f2fd',
+                          color: '#1976d2',
+                          height: '24px',
+                          fontSize: '0.75rem',
+                          borderRadius: '4px'
+                        }} 
+                      />
+                    </Box>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 1 }}>
+                      Known for
+                    </Typography>
+                    <Chip 
+                      label="IP reputation Medium risk" 
+                      sx={{ 
+                        bgcolor: '#e8f5e9',
+                        color: '#2e7d32',
+                        height: '24px',
+                        fontSize: '0.75rem',
+                        borderRadius: '4px'
+                      }} 
+                    />
+                  </Box>
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Violations Over Time */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" sx={{ 
+            mb: 2,
+            color: '#666',
+            fontSize: '0.75rem',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5
+          }}>
+            Violations over time <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+          </Typography>
+          <Box sx={{ 
+            height: 300,
+            bgcolor: '#fff',
+            borderRadius: 1,
+            p: 2
+          }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={analysisResult.violationsOverTime}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#666"
+                  tick={{ fontSize: 12 }}
+                  tickLine={{ stroke: '#666' }}
+                />
+                <YAxis 
+                  stroke="#666"
+                  tick={{ fontSize: 12 }}
+                  tickLine={{ stroke: '#666' }}
+                />
+                <RechartsTooltip 
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    padding: '8px'
+                  }}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="dos" name="DoS" stroke="#2196f3" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="automatedAttack" name="Automated Attack" stroke="#4caf50" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="rce" name="RCE/RFI" stroke="#673ab7" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="backdoorTrojan" name="Backdoor/Trojan" stroke="#f44336" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+        </Box>
+
+        {/* Bottom Charts */}
+        <Grid container spacing={3}>
+          {/* Violations */}
+          <Grid item xs={12} md={4}>
+            <Box sx={{ 
+              bgcolor: '#fff',
+              borderRadius: 1,
+              p: 2
+            }}>
+              <Typography variant="subtitle2" sx={{ 
+                mb: 2,
+                color: '#666',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5
+              }}>
+                Violations <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+              </Typography>
+              <Box sx={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'DoS', value: 50 },
+                        { name: 'Backdoor/Trojan', value: 25 },
+                        { name: 'RCE/RFI', value: 24 },
+                        { name: 'Other Violations', value: 1 }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      dataKey="value"
+                    >
+                      <Cell fill="#2196f3" />
+                      <Cell fill="#4caf50" />
+                      <Cell fill="#673ab7" />
+                      <Cell fill="#999" />
+                    </Pie>
+                    <Legend 
+                      formatter={(value, entry) => (
+                        <Typography sx={{ fontSize: '0.75rem', color: '#666' }}>
+                          {value} ({entry?.payload?.value ?? 0}%)
+                        </Typography>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            </Box>
+          </Grid>
+
+          {/* Client Applications */}
+          <Grid item xs={12} md={4}>
+            <Box sx={{ 
+              bgcolor: '#fff',
+              borderRadius: 1,
+              p: 2
+            }}>
+              <Typography variant="subtitle2" sx={{ 
+                mb: 2,
+                color: '#666',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5
+              }}>
+                Client applications <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+              </Typography>
+              <Box sx={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Suspicious', value: 99 },
+                        { name: 'Legitimate', value: 1 }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      dataKey="value"
+                    >
+                      <Cell fill="#ffc107" />
+                      <Cell fill="#999" />
+                    </Pie>
+                    <Legend 
+                      formatter={(value, entry) => (
+                        <Typography sx={{ fontSize: '0.75rem', color: '#666' }}>
+                          {value} ({entry?.payload?.value ?? 0}%)
+                        </Typography>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            </Box>
+          </Grid>
+
+          {/* Target Industries */}
+          <Grid item xs={12} md={4}>
+            <Box sx={{ 
+              bgcolor: '#fff',
+              borderRadius: 1,
+              p: 2
+            }}>
+              <Typography variant="subtitle2" sx={{ 
+                mb: 2,
+                color: '#666',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5
+              }}>
+                Target industries <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+              </Typography>
+              <Box sx={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Unclassified', value: 39 },
+                        { name: 'Business', value: 38 },
+                        { name: 'Entertainment & the Arts', value: 7 },
+                        { name: 'Other Industries', value: 16 }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      dataKey="value"
+                    >
+                      <Cell fill="#2196f3" />
+                      <Cell fill="#4caf50" />
+                      <Cell fill="#673ab7" />
+                      <Cell fill="#999" />
+                    </Pie>
+                    <Legend 
+                      formatter={(value, entry) => (
+                        <Typography sx={{ fontSize: '0.75rem', color: '#666' }}>
+                          {value} ({entry?.payload?.value ?? 0}%)
+                        </Typography>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ 
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      background: 'linear-gradient(180deg, #f8f9ff 0%, #ffffff 100%)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      bgcolor: '#fff',
+      p: 3
     }}>
-      {/* Main Content Container */}
       <Box sx={{
-        flex: 1,
+        width: '100%',
+        maxWidth: '600px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        py: { xs: 3, sm: 4, md: 5 },
-        px: { xs: 2, sm: 2.5, md: 3 },
       }}>
-        {/* Search Container */}
-        <Box sx={{
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            mb: 3, 
+            color: '#1a237e',
+            fontWeight: 600,
+            textAlign: 'center',
+            fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+            letterSpacing: '-0.5px',
+            '& span': {
+              color: '#1976d2',
+            }
+          }}
+        >
+          IP <span>Lookup</span>
+        </Typography>
+
+        <Box sx={{ 
           width: '100%',
-          maxWidth: '600px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          mb: analysisResult ? 4 : 0
+          position: 'relative', 
+          mb: 3
         }}>
-          {/* Title */}
-          <Typography 
-            variant="h4" 
-            sx={{ 
-              mb: 3, 
-              color: '#1a237e',
-              fontWeight: 600,
-              textAlign: 'center',
-              fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
-              letterSpacing: '-0.5px',
-              '& span': {
-                color: '#1976d2',
-              }
-            }}
+          <SearchTextField
+            fullWidth
+            placeholder="Enter IP to reveal its reputation..."
+            value={ipAddress}
+            onChange={(e) => setIpAddress(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={isAnalyzing}
+            error={!!error}
+            helperText={error}
+          />
+          <SearchButton 
+            onClick={handleSearch}
+            disabled={isAnalyzing}
           >
-            IP <span>Lookup</span>
-          </Typography>
-
-          {/* Search Section */}
-          <Box sx={{ 
-            width: '100%',
-            position: 'relative', 
-            mb: 3,
-            px: { xs: 1, sm: 1.5 }
-          }}>
-            <SearchTextField
-              fullWidth
-              placeholder="Enter IP to reveal its reputation..."
-              value={ipAddress}
-              onChange={(e) => setIpAddress(e.target.value)}
-              onKeyPress={handleKeyPress}
-            />
-            <SearchButton onClick={handleSearch}>
+            {isAnalyzing ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
               <SearchIcon />
-            </SearchButton>
-          </Box>
-
-          {/* Recently Investigated IPs */}
-          <Box sx={{ 
-            width: '100%',
-            px: { xs: 1, sm: 1.5 },
-            mb: 3
-          }}>
-            <Typography 
-              variant="subtitle2" 
-              sx={{ 
-                mb: 1.5, 
-                color: '#37474f',
-                fontWeight: 500,
-                fontSize: '0.8rem',
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                textAlign: 'center'
-              }}
-            >
-              Recently investigated IPs
-            </Typography>
-            <Box sx={{ 
-              display: 'flex', 
-              flexWrap: 'wrap', 
-              gap: 1.5,
-              justifyContent: 'center',
-              borderTop: '1px solid rgba(0,0,0,0.08)',
-              pt: 1.5,
-              pb: 1
-            }}>
-              {recentIPs.map((ip, index) => (
-                <Box 
-                  key={index} 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center',
-                    background: 'white',
-                    borderRadius: '6px',
-                    padding: '4px 10px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      transform: 'translateY(-1px)'
-                    }
-                  }}
-                >
-                  <Typography sx={{ 
-                    mr: 1, 
-                    fontSize: '0.9rem',
-                    filter: 'grayscale(0.2)'
-                  }}>
-                    {ip.flag}
-                  </Typography>
-                  <Link
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setIpAddress(ip.ip);
-                      handleSearch();
-                    }}
-                    sx={{
-                      color: '#1976d2',
-                      textDecoration: 'none',
-                      fontWeight: 500,
-                      fontSize: '0.8rem',
-                      '&:hover': {
-                        color: '#1565c0',
-                        textDecoration: 'none',
-                      },
-                    }}
-                  >
-                    {ip.ip}
-                  </Link>
-                </Box>
-              ))}
-            </Box>
-          </Box>
+            )}
+          </SearchButton>
         </Box>
 
-        {/* Analysis Result */}
-        {analysisResult && (
-          <Box sx={{ width: '100%', maxWidth: '1000px' }}>
-            <Grid container spacing={2} sx={{ mt: 0 }}>
-              {/* Risk Score */}
-              <Grid item xs={12} md={4}>
-                <Card sx={{ 
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                  height: '100%',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 6px 25px rgba(0,0,0,0.12)',
-                  }
-                }}>
-                  <CardContent sx={{ p: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom sx={{ 
-                      fontWeight: 600,
-                      color: '#1a237e',
-                      mb: 1.5,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      fontSize: '0.9rem'
-                    }}>
-                      <SecurityIcon color="primary" sx={{ fontSize: '1.1rem' }} />
-                      Risk Score
-                    </Typography>
-                    <RiskScoreGauge score={analysisResult.riskScore} />
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary" 
-                      align="center" 
-                      sx={{ 
-                        mt: 1.5,
-                        fontSize: '0.75rem',
-                        lineHeight: 1.4,
-                        px: 1
-                      }}
-                    >
-                      Risk score reason: Low magnitude SQLi, Path Traversal/LFI, MISC attacks targeting several customers
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Origin & Reputation */}
-              <Grid item xs={12} md={8}>
-                <Card sx={{ 
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                  height: '100%',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 6px 25px rgba(0,0,0,0.12)',
-                  }
-                }}>
-                  <CardContent sx={{ p: 2 }}>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="subtitle1" gutterBottom sx={{ 
-                          fontWeight: 600,
-                          color: '#1a237e',
-                          mb: 1.5,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          fontSize: '0.9rem'
-                        }}>
-                          <PublicIcon color="primary" sx={{ fontSize: '1.1rem' }} />
-                          Origin
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ 
-                              mb: 0.25, 
-                              fontSize: '0.7rem', 
-                              textTransform: 'uppercase', 
-                              letterSpacing: '0.5px' 
-                            }}>
-                              Country
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.85rem' }}>
-                              {analysisResult.origin.country}
-                            </Typography>
-                          </Box>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ 
-                              mb: 0.25, 
-                              fontSize: '0.7rem', 
-                              textTransform: 'uppercase', 
-                              letterSpacing: '0.5px' 
-                            }}>
-                              City
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.85rem' }}>
-                              {analysisResult.origin.city}
-                            </Typography>
-                          </Box>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ 
-                              mb: 0.25, 
-                              fontSize: '0.7rem', 
-                              textTransform: 'uppercase', 
-                              letterSpacing: '0.5px' 
-                            }}>
-                              ASN
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.85rem' }}>
-                              {analysisResult.origin.asn}
-                            </Typography>
-                          </Box>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ 
-                              mb: 0.25, 
-                              fontSize: '0.7rem', 
-                              textTransform: 'uppercase', 
-                              letterSpacing: '0.5px' 
-                            }}>
-                              Requests
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.85rem' }}>
-                              {analysisResult.origin.requests}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="subtitle1" gutterBottom sx={{ 
-                          fontWeight: 600,
-                          color: '#1a237e',
-                          mb: 1.5,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          fontSize: '0.9rem'
-                        }}>
-                          <ShieldIcon color="primary" sx={{ fontSize: '1.1rem' }} />
-                          Reputation
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ 
-                              mb: 1, 
-                              fontSize: '0.7rem', 
-                              textTransform: 'uppercase', 
-                              letterSpacing: '0.5px' 
-                            }}>
-                              Known as
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                              {analysisResult.reputation.knownAs.map((item, index) => (
-                                <Chip
-                                  key={index}
-                                  label={item}
-                                  sx={{
-                                    borderRadius: '6px',
-                                    backgroundColor: 'rgba(25, 118, 210, 0.08)',
-                                    color: '#1976d2',
-                                    fontWeight: 500,
-                                    fontSize: '0.75rem',
-                                    height: '24px',
-                                    '&:hover': {
-                                      backgroundColor: 'rgba(25, 118, 210, 0.12)',
-                                    }
-                                  }}
-                                />
-                              ))}
-                            </Box>
-                          </Box>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ 
-                              mb: 1, 
-                              fontSize: '0.7rem', 
-                              textTransform: 'uppercase', 
-                              letterSpacing: '0.5px' 
-                            }}>
-                              Known for
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                              {analysisResult.reputation.knownFor.map((item, index) => (
-                                <Chip
-                                  key={index}
-                                  label={item}
-                                  sx={{
-                                    borderRadius: '6px',
-                                    backgroundColor: 'rgba(255, 152, 0, 0.08)',
-                                    color: '#f57c00',
-                                    fontWeight: 500,
-                                    fontSize: '0.75rem',
-                                    height: '24px',
-                                    '&:hover': {
-                                      backgroundColor: 'rgba(255, 152, 0, 0.12)',
-                                    }
-                                  }}
-                                />
-                              ))}
-                            </Box>
-                          </Box>
-                        </Box>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Violations Over Time */}
-              <Grid item xs={12}>
-                <Card sx={{ borderRadius: '8px', /* ... existing styles ... */ }}>
-                  <CardContent sx={{ p: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom sx={{ /* ... same as above ... */ }}>
-                      <TimelineIcon color="primary" sx={{ fontSize: '1.1rem' }} />
-                      Violations over time
-                    </Typography>
-                    <Box sx={{ height: 300, mt: 1 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={analysisResult.violationsOverTime}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                          <XAxis dataKey="date" stroke="#666" />
-                          <YAxis stroke="#666" />
-                          <RechartsTooltip 
-                            contentStyle={{
-                              backgroundColor: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                              padding: '12px'
-                            }}
-                          />
-                          <Legend />
-                          <Line type="monotone" dataKey="pathTraversal" stroke="#8884d8" strokeWidth={2} name="Path Traversal/LFI" dot={false} />
-                          <Line type="monotone" dataKey="automatedAttack" stroke="#82ca9d" strokeWidth={2} name="Automated Attack" dot={false} />
-                          <Line type="monotone" dataKey="sqli" stroke="#ffc658" strokeWidth={2} name="SQLi" dot={false} />
-                          <Line type="monotone" dataKey="rce" stroke="#ff7300" strokeWidth={2} name="RCE/RFI" dot={false} />
-                          <Line type="monotone" dataKey="spam" stroke="#ff4842" strokeWidth={2} name="Spam" dot={false} />
-                          <Line type="monotone" dataKey="misc" stroke="#00C49F" strokeWidth={2} name="MISC" dot={false} />
-                          <Line type="monotone" dataKey="xss" stroke="#FFBB28" strokeWidth={2} name="XSS" dot={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Violations Distribution */}
-              <Grid item xs={12} md={6}>
-                <Card sx={{ borderRadius: '8px', /* ... existing styles ... */ }}>
-                  <CardContent sx={{ p: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom sx={{ /* ... same as above ... */ }}>
-                      <BugReportIcon color="primary" sx={{ fontSize: '1.1rem' }} />
-                      Violations
-                    </Typography>
-                    <Box sx={{ height: 220 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={analysisResult.violations}
-                            dataKey="percentage"
-                            nameKey="type"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={100}
-                            fill="#8884d8"
-                            label
-                          >
-                            {analysisResult.violations.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <RechartsTooltip 
-                            contentStyle={{
-                              backgroundColor: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                              padding: '12px'
-                            }}
-                          />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Target Industries */}
-              <Grid item xs={12} md={6}>
-                <Card sx={{ borderRadius: '8px', /* ... existing styles ... */ }}>
-                  <CardContent sx={{ p: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom sx={{ /* ... same as above ... */ }}>
-                      <LanguageIcon color="primary" sx={{ fontSize: '1.1rem' }} />
-                      Target Industries
-                    </Typography>
-                    <Box sx={{ height: 220 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={analysisResult.targetIndustries}
-                            dataKey="percentage"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={100}
-                            fill="#8884d8"
-                            label
-                          >
-                            {analysisResult.targetIndustries.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <RechartsTooltip 
-                            contentStyle={{
-                              backgroundColor: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                              padding: '12px'
-                            }}
-                          />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
+        {isAnalyzing && (
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            mt: 4 
+          }}>
+            <CircularProgress size={40} />
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                mt: 2,
+                color: 'text.secondary',
+                fontSize: '0.85rem'
+              }}
+            >
+              Analyzing IP address...
+            </Typography>
           </Box>
         )}
+
+        {error && (
+          <Alert 
+            severity="error" 
+            sx={{ 
+              mt: 2,
+              width: '100%',
+              fontSize: '0.85rem'
+            }}
+          >
+            {error}
+          </Alert>
+        )}
+
+        {/* Recently Investigated IPs */}
+        <Box sx={{ 
+          width: '100%',
+          mt: 3
+        }}>
+          <Typography 
+            variant="subtitle2" 
+            sx={{ 
+              mb: 1.5, 
+              color: '#37474f',
+              fontWeight: 500,
+              fontSize: '0.8rem',
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              textAlign: 'center'
+            }}
+          >
+            Recently investigated IPs
+          </Typography>
+          <Box sx={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: 1.5,
+            justifyContent: 'center',
+            borderTop: '1px solid rgba(0,0,0,0.08)',
+            pt: 1.5
+          }}>
+            {recentIPs.map((ip, index) => (
+              <Box 
+                key={index} 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  background: 'white',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    transform: 'translateY(-1px)'
+                  }
+                }}
+                onClick={() => {
+                  setIpAddress(ip.ip);
+                  handleSearch();
+                }}
+              >
+                <Typography sx={{ 
+                  mr: 1, 
+                  fontSize: '0.9rem',
+                  filter: 'grayscale(0.2)'
+                }}>
+                  {ip.flag}
+                </Typography>
+                <Typography sx={{
+                  color: '#1976d2',
+                  fontWeight: 500,
+                  fontSize: '0.8rem'
+                }}>
+                  {ip.ip}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
       </Box>
     </Box>
   );
