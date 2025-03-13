@@ -53,6 +53,7 @@ import {
   Legend,
   LineChart,
   Line,
+  TooltipProps
 } from 'recharts';
 
 interface IPAnalysisResult {
@@ -338,7 +339,7 @@ export default function TrustIPAnalytics() {
   };
 
   if (showAnalysis && analysisResult) {
-    return (
+  return (
       <Box sx={{ 
         minHeight: '100vh',
         bgcolor: '#fff',
@@ -346,7 +347,7 @@ export default function TrustIPAnalytics() {
       }}>
         {/* Risk and Origin Section */}
         <Box sx={{ 
-          bgcolor: '#fff', 
+              bgcolor: '#fff',
           borderRadius: 1,
           mb: 3
         }}>
@@ -375,7 +376,7 @@ export default function TrustIPAnalytics() {
                   textTransform: 'uppercase'
                 }}>
                   RISK SCORE <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
-                </Typography>
+              </Typography>
                 <RiskScoreGauge score={75} />
                 <Box sx={{ 
                   display: 'flex', 
@@ -396,8 +397,8 @@ export default function TrustIPAnalytics() {
                     lineHeight: 1.4
                   }}>
                     Risk score reason: Low magnitude RCE/RFI, Backdoor/Trojan attacks targeting many customers
-                  </Typography>
-                </Box>
+              </Typography>
+            </Box>
               </Box>
             </Grid>
 
@@ -414,8 +415,8 @@ export default function TrustIPAnalytics() {
                   gap: 0.5
                 }}>
                   ORIGIN <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
-                </Typography>
-                <Grid container spacing={2}>
+              </Typography>
+              <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
@@ -424,8 +425,8 @@ export default function TrustIPAnalytics() {
                           fontSize: '0.75rem',
                           width: '80px'
                         }}>
-                          Country
-                        </Typography>
+                    Country
+                  </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography sx={{ fontSize: '0.875rem', color: '#333' }}>Japan</Typography>
                           <Box component="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAALCAYAAAB24g05AAAACXBIWXMAAAsTAAALEwEAmpwYAAABEElEQVQokZXSPUsDQRAG4GcvuUAUFCwEQYJgYaGdWFiIhYiFlX/B0kLwJ1hYiYWFhYVYWFhYiJ2FhYVYCIKFIAhBEEQQgkJAYpFbvdxlL5d44DBvM7Mzu+/uRXEcK0Yd27jBHZbxhBk8Yx8bmMQIVrCFR0wjxTWOsIxpPGAfDQWAKg7QxiD6cYYWtnGPBKNI0UAXhxjDEFbRg0XsIUUZTbygF5c4wQ0qSHCOBvpQ+mHcxTvqmMMNLjCBccQ4xBs2MY8EZZz+BvCXlHGMd8yhimtcYQJ1vOIe42jjDvN/gYsAKQZwhnc0MY0mzjGJUbxhB6NYwyeaWMBcnvGXRHEcJ1jCJnbxhB4MYwdP2MVnl/9fvt2TPzX0NgIAAAAASUVORK5CYII=" sx={{ width: 16, height: 12 }} />
@@ -437,8 +438,8 @@ export default function TrustIPAnalytics() {
                           fontSize: '0.75rem',
                           width: '80px'
                         }}>
-                          ASN
-                        </Typography>
+                    ASN
+                  </Typography>
                         <Typography sx={{ fontSize: '0.875rem', color: '#333' }}>
                           MICROSOFT-CORP-MSN-AS-BLOCK (#8075)
                         </Typography>
@@ -453,7 +454,7 @@ export default function TrustIPAnalytics() {
                         </Typography>
                         <Typography sx={{ fontSize: '0.875rem', color: '#333' }}>
                           656.3K
-                        </Typography>
+                  </Typography>
                       </Box>
                     </Box>
                   </Grid>
@@ -472,44 +473,44 @@ export default function TrustIPAnalytics() {
                     REPUTATION <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Box>
+            <Box>
                       <Typography sx={{ color: '#666', fontSize: '0.75rem', mb: 1 }}>
-                        Known to use
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Chip 
+                  Known to use
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Chip 
                           label="Microsoft" 
-                          sx={{ 
+                    sx={{ 
                             bgcolor: '#e3f2fd',
                             color: '#1976d2',
                             height: '24px',
-                            fontSize: '0.75rem',
+                      fontSize: '0.75rem',
                             borderRadius: '4px',
                             fontWeight: 400,
                             border: 'none'
-                          }} 
-                        />
-                        <Chip 
+                    }} 
+                  />
+                  <Chip 
                           label="Microsoft Azure" 
-                          sx={{ 
+                    sx={{ 
                             bgcolor: '#e3f2fd',
                             color: '#1976d2',
                             height: '24px',
-                            fontSize: '0.75rem',
+                      fontSize: '0.75rem',
                             borderRadius: '4px',
                             fontWeight: 400,
                             border: 'none'
-                          }} 
-                        />
-                      </Box>
-                    </Box>
-                    <Box>
+                    }} 
+                  />
+                </Box>
+              </Box>
+              <Box>
                       <Typography sx={{ color: '#666', fontSize: '0.75rem', mb: 1 }}>
-                        Known for
-                      </Typography>
-                      <Chip 
-                        label="IP reputation Medium risk" 
-                        sx={{ 
+                  Known for
+                </Typography>
+                <Chip 
+                  label="IP reputation Medium risk"
+                  sx={{ 
                           bgcolor: '#e8f5e9',
                           color: '#2e7d32',
                           height: '24px',
@@ -538,42 +539,128 @@ export default function TrustIPAnalytics() {
             alignItems: 'center',
             gap: 0.5
           }}>
-            Violations over time <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+            Violations over time <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
           </Typography>
           <Box sx={{ 
             height: 300,
             bgcolor: '#fff',
             borderRadius: 1,
-            p: 2
+            p: 2,
+            '& .recharts-cartesian-grid-horizontal line, & .recharts-cartesian-grid-vertical line': {
+              stroke: '#eee'
+            },
+            '& .recharts-tooltip-wrapper': {
+              outline: 'none'
+            }
           }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={analysisResult.violationsOverTime}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+              <LineChart 
+                data={[
+                  { date: '26. Feb', pathTraversal: 0, automatedAttack: 100, sqli: 0, misc: 0 },
+                  { date: '27. Feb', pathTraversal: 200, automatedAttack: 300, sqli: 50, misc: 20 },
+                  { date: '28. Feb', pathTraversal: 0, automatedAttack: 0, sqli: 0, misc: 0 },
+                  { date: '1. Mar', pathTraversal: 800, automatedAttack: 100, sqli: 100, misc: 0 },
+                  { date: '2. Mar', pathTraversal: 850, automatedAttack: 50, sqli: 150, misc: 0 },
+                  { date: '3. Mar', pathTraversal: 400, automatedAttack: 0, sqli: 200, misc: 0 },
+                  { date: '4. Mar', pathTraversal: 200, automatedAttack: 0, sqli: 0, misc: 0 },
+                  { date: '5. Mar', pathTraversal: 100, automatedAttack: 0, sqli: 0, misc: 0 },
+                  { date: '6. Mar', pathTraversal: 300, automatedAttack: 900, sqli: 100, misc: 0 },
+                  { date: '7. Mar', pathTraversal: 200, automatedAttack: 2200, sqli: 150, misc: 0 },
+                  { date: '8. Mar', pathTraversal: 100, automatedAttack: 1800, sqli: 200, misc: 0 },
+                  { date: '9. Mar', pathTraversal: 300, automatedAttack: 900, sqli: 100, misc: 0 },
+                  { date: '10. Mar', pathTraversal: 400, automatedAttack: 2000, sqli: 50, misc: 0 },
+                  { date: '11. Mar', pathTraversal: 200, automatedAttack: 1000, sqli: 0, misc: 0 },
+                  { date: '12. Mar', pathTraversal: 0, automatedAttack: 0, sqli: 0, misc: 0 }
+                ]}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
                 <XAxis 
                   dataKey="date" 
                   stroke="#666"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, fill: '#666' }}
                   tickLine={{ stroke: '#666' }}
+                  axisLine={{ stroke: '#666' }}
                 />
                 <YAxis 
                   stroke="#666"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, fill: '#666' }}
                   tickLine={{ stroke: '#666' }}
+                  axisLine={{ stroke: '#666' }}
+                  tickFormatter={(value) => value === 0 ? '0' : `${value/1000}k`}
+                  domain={[0, 3000]}
                 />
-                <RechartsTooltip 
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    padding: '8px'
+                <RechartsTooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <Box sx={{
+                          backgroundColor: 'white',
+                          border: '1px solid #eee',
+                          borderRadius: '4px',
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          outline: 'none'
+                        }}>
+                          <Typography sx={{ mb: 1, fontWeight: 500 }}>{label}</Typography>
+                          {payload.map((entry, index) => (
+                            <Typography key={index} sx={{ color: entry.color }}>
+                              {entry.name}: {entry.value}
+                            </Typography>
+                          ))}
+                        </Box>
+                      );
+                    }
+                    return null;
                   }}
                 />
-                <Legend />
-                <Line type="monotone" dataKey="dos" name="DoS" stroke="#2196f3" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="automatedAttack" name="Automated Attack" stroke="#4caf50" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="rce" name="RCE/RFI" stroke="#673ab7" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="backdoorTrojan" name="Backdoor/Trojan" stroke="#f44336" strokeWidth={2} dot={false} />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  iconType="line"
+                  iconSize={10}
+                  wrapperStyle={{ fontSize: '12px', color: '#666' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="pathTraversal" 
+                  name="Path Traversal/LFI" 
+                  stroke="#1976d2" 
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={{ r: 2, fill: '#1976d2' }}
+                  activeDot={{ r: 4 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="automatedAttack" 
+                  name="Automated Attack" 
+                  stroke="#4caf50" 
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={{ r: 2, fill: '#4caf50' }}
+                  activeDot={{ r: 4 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="sqli" 
+                  name="SQLi" 
+                  stroke="#9c27b0" 
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={{ r: 2, fill: '#9c27b0' }}
+                  activeDot={{ r: 4 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="misc" 
+                  name="MISC" 
+                  stroke="#f44336" 
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={{ r: 2, fill: '#f44336' }}
+                  activeDot={{ r: 4 }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </Box>
@@ -597,16 +684,16 @@ export default function TrustIPAnalytics() {
                 alignItems: 'center',
                 gap: 0.5
               }}>
-                Violations <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+                Violations <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
               </Typography>
               <Box sx={{ height: 220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={[
-                        { name: 'DoS', value: 50 },
-                        { name: 'Backdoor/Trojan', value: 25 },
-                        { name: 'RCE/RFI', value: 24 },
+                        { name: 'Automated Attack', value: 76 },
+                        { name: 'Path Traversal/LFI', value: 21 },
+                        { name: 'SQLi', value: 3 },
                         { name: 'Other Violations', value: 1 }
                       ]}
                       cx="50%"
@@ -614,16 +701,29 @@ export default function TrustIPAnalytics() {
                       innerRadius={60}
                       outerRadius={80}
                       dataKey="value"
+                      startAngle={90}
+                      endAngle={-270}
                     >
                       <Cell fill="#2196f3" />
                       <Cell fill="#4caf50" />
                       <Cell fill="#673ab7" />
-                      <Cell fill="#999" />
+                      <Cell fill="#e0e0e0" />
                     </Pie>
-                    <Legend 
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                      iconType="plainline"
+                      iconSize={30}
                       formatter={(value, entry) => (
-                        <Typography sx={{ fontSize: '0.75rem', color: '#666' }}>
-                          {value} ({entry?.payload?.value ?? 0}%)
+                        <Typography sx={{ 
+                          fontSize: '0.75rem', 
+                          color: '#666',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1
+                        }}>
+                          {value} ({entry?.payload?.value}%)
                         </Typography>
                       )}
                     />
@@ -649,29 +749,44 @@ export default function TrustIPAnalytics() {
                 alignItems: 'center',
                 gap: 0.5
               }}>
-                Client applications <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+                Client applications <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
               </Typography>
               <Box sx={{ height: 220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={[
-                        { name: 'Suspicious', value: 99 },
-                        { name: 'Legitimate', value: 1 }
+                        { name: 'Legitimate', value: 70 },
+                        { name: 'Suspicious', value: 24 },
+                        { name: 'Malicious', value: 6 }
                       ]}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
                       outerRadius={80}
                       dataKey="value"
+                      startAngle={90}
+                      endAngle={-270}
                     >
+                      <Cell fill="#e0e0e0" />
                       <Cell fill="#ffc107" />
-                      <Cell fill="#999" />
+                      <Cell fill="#f44336" />
                     </Pie>
-                    <Legend 
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                      iconType="plainline"
+                      iconSize={30}
                       formatter={(value, entry) => (
-                        <Typography sx={{ fontSize: '0.75rem', color: '#666' }}>
-                          {value} ({entry?.payload?.value ?? 0}%)
+                        <Typography sx={{ 
+                          fontSize: '0.75rem', 
+                          color: '#666',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1
+                        }}>
+                          {value} ({entry?.payload?.value}%)
                         </Typography>
                       )}
                     />
@@ -697,33 +812,46 @@ export default function TrustIPAnalytics() {
                 alignItems: 'center',
                 gap: 0.5
               }}>
-                Target industries <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+                Target industries <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
               </Typography>
               <Box sx={{ height: 220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={[
-                        { name: 'Unclassified', value: 39 },
-                        { name: 'Business', value: 38 },
-                        { name: 'Entertainment & the Arts', value: 7 },
-                        { name: 'Other Industries', value: 16 }
+                        { name: 'Unclassified', value: 26 },
+                        { name: 'Retail', value: 21 },
+                        { name: 'Healthcare', value: 10 },
+                        { name: 'Other Industries', value: 43 }
                       ]}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
                       outerRadius={80}
                       dataKey="value"
+                      startAngle={90}
+                      endAngle={-270}
                     >
                       <Cell fill="#2196f3" />
                       <Cell fill="#4caf50" />
                       <Cell fill="#673ab7" />
-                      <Cell fill="#999" />
+                      <Cell fill="#e0e0e0" />
                     </Pie>
-                    <Legend 
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                      iconType="plainline"
+                      iconSize={30}
                       formatter={(value, entry) => (
-                        <Typography sx={{ fontSize: '0.75rem', color: '#666' }}>
-                          {value} ({entry?.payload?.value ?? 0}%)
+                        <Typography sx={{ 
+                          fontSize: '0.75rem', 
+                          color: '#666',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1
+                        }}>
+                          {value} ({entry?.payload?.value}%)
                         </Typography>
                       )}
                     />
@@ -839,7 +967,7 @@ export default function TrustIPAnalytics() {
         }}>
           <Typography 
             variant="subtitle2" 
-            sx={{ 
+                sx={{ 
               mb: 1.5, 
               color: '#37474f',
               fontWeight: 500,
@@ -899,7 +1027,7 @@ export default function TrustIPAnalytics() {
             ))}
           </Box>
         </Box>
-      </Box>
+            </Box>
     </Box>
   );
 } 
