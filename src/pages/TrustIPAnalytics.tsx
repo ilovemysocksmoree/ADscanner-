@@ -158,42 +158,64 @@ const mockAnalysis = (ip: string): Promise<IPAnalysisResult> => {
 };
 
 const RiskScoreGauge = ({ score }: { score: number }) => {
-  const rotation = (score / 100) * 180;
-  
   return (
-    <Box sx={{ position: 'relative', width: '200px', height: '120px', margin: '0 auto' }}>
-      <svg width="200" height="120" viewBox="0 0 200 120">
-        {/* Background arc */}
+    <Box sx={{ position: 'relative', width: '100%', maxWidth: '200px', height: '120px' }}>
+      <svg width="100%" height="100%" viewBox="0 0 200 100">
+        <defs>
+          <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#fdd835" />
+            <stop offset="50%" stopColor="#ff9800" />
+            <stop offset="100%" stopColor="#f44336" />
+          </linearGradient>
+        </defs>
+        
+        {/* Background Arc */}
         <path
-          d="M20 80 A 60 60 0 0 1 180 80"
+          d="M 20 80 A 60 60 0 0 1 180 80"
           fill="none"
-          stroke="#e0e0e0"
-          strokeWidth="20"
+          stroke="#f5f5f5"
+          strokeWidth="16"
           strokeLinecap="round"
         />
-        {/* Score arc */}
+        
+        {/* Score Arc */}
         <path
-          d="M20 80 A 60 60 0 0 1 180 80"
+          d="M 20 80 A 60 60 0 0 1 180 80"
           fill="none"
-          stroke={score > 75 ? '#ff4842' : score > 50 ? '#ffa726' : '#4caf50'}
-          strokeWidth="20"
+          stroke="url(#gaugeGradient)"
+          strokeWidth="16"
           strokeLinecap="round"
-          strokeDasharray={`${(rotation / 180) * 251.2}, 251.2`}
+          strokeDasharray={`${(score / 100) * 251.2} 251.2`}
         />
-        {/* Score text */}
+        
+        {/* Indicator */}
+        <g transform={`rotate(${(score / 100) * 180 - 90}, 100, 80)`}>
+          <line
+            x1="100"
+            y1="80"
+            x2="100"
+            y2="40"
+            stroke="#333"
+            strokeWidth="1.5"
+          />
+          <circle cx="100" cy="40" r="3" fill="#333" />
+        </g>
+        
+        {/* Score Text */}
         <text
           x="100"
-          y="85"
+          y="70"
           textAnchor="middle"
-          fontSize="32"
-          fontWeight="bold"
+          fontSize="28"
+          fontWeight="500"
           fill="#333"
         >
           {score}
         </text>
+        
         {/* Labels */}
-        <text x="30" y="110" fontSize="12" fill="#666">Low</text>
-        <text x="160" y="110" fontSize="12" fill="#666">High</text>
+        <text x="20" y="95" fontSize="12" fill="#666">Low</text>
+        <text x="170" y="95" fontSize="12" fill="#666">High</text>
       </svg>
     </Box>
   );
@@ -329,10 +351,11 @@ export default function TrustIPAnalytics() {
           mb: 3
         }}>
           <Typography variant="h6" sx={{ 
-            color: '#333',
-            fontSize: '1rem',
+            color: '#666',
+            fontSize: '0.875rem',
             fontWeight: 500,
-            mb: 2
+            mb: 2,
+            textTransform: 'none'
           }}>
             Risk and origin
           </Typography>
@@ -342,15 +365,16 @@ export default function TrustIPAnalytics() {
             <Grid item xs={12} md={4}>
               <Box>
                 <Typography variant="subtitle2" sx={{ 
-                  mb: 1, 
+                  mb: 2, 
                   color: '#666',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 0.5,
                   fontSize: '0.75rem',
-                  fontWeight: 500
+                  fontWeight: 500,
+                  textTransform: 'uppercase'
                 }}>
-                  RISK SCORE <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+                  RISK SCORE <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
                 </Typography>
                 <RiskScoreGauge score={75} />
                 <Box sx={{ 
@@ -359,7 +383,13 @@ export default function TrustIPAnalytics() {
                   gap: 1,
                   mt: 2
                 }}>
-                  <InfoIcon sx={{ fontSize: '1rem', color: '#2196f3', mt: 0.3 }} />
+                  <Box sx={{ 
+                    width: '8px', 
+                    height: '8px', 
+                    borderRadius: '50%', 
+                    bgcolor: '#2196f3', 
+                    mt: 0.6 
+                  }} />
                   <Typography variant="body2" sx={{ 
                     color: '#666',
                     fontSize: '0.85rem',
@@ -378,40 +408,53 @@ export default function TrustIPAnalytics() {
                   mb: 2,
                   color: '#666',
                   fontSize: '0.75rem',
-                  fontWeight: 500
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5
                 }}>
-                  ORIGIN
+                  ORIGIN <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
                 </Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
-                        Country
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography>Japan</Typography>
-                        <Typography component="span" sx={{ fontSize: '1.2rem' }}>🇯🇵</Typography>
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                        <Typography sx={{ 
+                          color: '#666',
+                          fontSize: '0.75rem',
+                          width: '80px'
+                        }}>
+                          Country
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography sx={{ fontSize: '0.875rem', color: '#333' }}>Japan</Typography>
+                          <Box component="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAALCAYAAAB24g05AAAACXBIWXMAAAsTAAALEwEAmpwYAAABEElEQVQokZXSPUsDQRAG4GcvuUAUFCwEQYJgYaGdWFiIhYiFlX/B0kLwJ1hYiYWFhYVYWFhYiJ2FhYVYCIKFIAhBEEQQgkJAYpFbvdxlL5d44DBvM7Mzu+/uRXEcK0Yd27jBHZbxhBk8Yx8bmMQIVrCFR0wjxTWOsIxpPGAfDQWAKg7QxiD6cYYWtnGPBKNI0UAXhxjDEFbRg0XsIUUZTbygF5c4wQ0qSHCOBvpQ+mHcxTvqmMMNLjCBccQ4xBs2MY8EZZz+BvCXlHGMd8yhimtcYQJ1vOIe42jjDvN/gYsAKQZwhnc0MY0mzjGJUbxhB6NYwyeaWMBcnvGXRHEcJ1jCJnbxhB4MYwdP2MVnl/9fvt2TPzX0NgIAAAAASUVORK5CYII=" sx={{ width: 16, height: 12 }} />
+                        </Box>
                       </Box>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
-                        City
-                      </Typography>
-                      <Typography>Tokyo</Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
-                        ASN
-                      </Typography>
-                      <Typography>MICROSOFT-CORP-MSN-AS-BLOCK (#8075)</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
-                        Requests
-                      </Typography>
-                      <Typography>656.3K</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                        <Typography sx={{ 
+                          color: '#666',
+                          fontSize: '0.75rem',
+                          width: '80px'
+                        }}>
+                          ASN
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.875rem', color: '#333' }}>
+                          MICROSOFT-CORP-MSN-AS-BLOCK (#8075)
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                        <Typography sx={{ 
+                          color: '#666',
+                          fontSize: '0.75rem',
+                          width: '80px'
+                        }}>
+                          Requests
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.875rem', color: '#333' }}>
+                          656.3K
+                        </Typography>
+                      </Box>
                     </Box>
                   </Grid>
                 </Grid>
@@ -426,49 +469,57 @@ export default function TrustIPAnalytics() {
                     alignItems: 'center',
                     gap: 0.5
                   }}>
-                    REPUTATION <InfoIcon sx={{ fontSize: '1rem', color: '#999' }} />
+                    REPUTATION <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
                   </Typography>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 1 }}>
-                      Known to use
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box>
+                      <Typography sx={{ color: '#666', fontSize: '0.75rem', mb: 1 }}>
+                        Known to use
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Chip 
+                          label="Microsoft" 
+                          sx={{ 
+                            bgcolor: '#e3f2fd',
+                            color: '#1976d2',
+                            height: '24px',
+                            fontSize: '0.75rem',
+                            borderRadius: '4px',
+                            fontWeight: 400,
+                            border: 'none'
+                          }} 
+                        />
+                        <Chip 
+                          label="Microsoft Azure" 
+                          sx={{ 
+                            bgcolor: '#e3f2fd',
+                            color: '#1976d2',
+                            height: '24px',
+                            fontSize: '0.75rem',
+                            borderRadius: '4px',
+                            fontWeight: 400,
+                            border: 'none'
+                          }} 
+                        />
+                      </Box>
+                    </Box>
+                    <Box>
+                      <Typography sx={{ color: '#666', fontSize: '0.75rem', mb: 1 }}>
+                        Known for
+                      </Typography>
                       <Chip 
-                        label="Microsoft" 
+                        label="IP reputation Medium risk" 
                         sx={{ 
-                          bgcolor: '#e3f2fd',
-                          color: '#1976d2',
+                          bgcolor: '#e8f5e9',
+                          color: '#2e7d32',
                           height: '24px',
                           fontSize: '0.75rem',
-                          borderRadius: '4px'
-                        }} 
-                      />
-                      <Chip 
-                        label="Microsoft Azure" 
-                        sx={{ 
-                          bgcolor: '#e3f2fd',
-                          color: '#1976d2',
-                          height: '24px',
-                          fontSize: '0.75rem',
-                          borderRadius: '4px'
+                          borderRadius: '4px',
+                          fontWeight: 400,
+                          border: 'none'
                         }} 
                       />
                     </Box>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 1 }}>
-                      Known for
-                    </Typography>
-                    <Chip 
-                      label="IP reputation Medium risk" 
-                      sx={{ 
-                        bgcolor: '#e8f5e9',
-                        color: '#2e7d32',
-                        height: '24px',
-                        fontSize: '0.75rem',
-                        borderRadius: '4px'
-                      }} 
-                    />
                   </Box>
                 </Box>
               </Box>
