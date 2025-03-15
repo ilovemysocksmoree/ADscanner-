@@ -376,37 +376,29 @@ export default function TrustIPAnalytics() {
                   textTransform: 'uppercase'
                 }}>
                   RISK SCORE <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
-                </Typography>
+              </Typography>
+                <RiskScoreGauge score={75} />
                 <Box sx={{ 
-                  display: 'flex',
-                  flexDirection: 'column',
+                  display: 'flex', 
                   alignItems: 'flex-start',
-                  gap: 2
+                  gap: 1,
+                  mt: 2
                 }}>
-                  <RiskScoreGauge score={75} />
                   <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'flex-start',
-                    gap: 1,
-                    mt: 1
+                    width: '8px', 
+                    height: '8px', 
+                    borderRadius: '50%', 
+                    bgcolor: '#2196f3', 
+                    mt: 0.6 
+                  }} />
+                  <Typography variant="body2" sx={{ 
+                    color: '#666',
+                    fontSize: '0.85rem',
+                    lineHeight: 1.4
                   }}>
-                    <Box sx={{ 
-                      width: '6px', 
-                      height: '6px', 
-                      borderRadius: '50%', 
-                      bgcolor: '#2196f3', 
-                      mt: 0.7
-                    }} />
-                    <Typography variant="body2" sx={{ 
-                      color: '#666',
-                      fontSize: '0.8rem',
-                      lineHeight: 1.5,
-                      maxWidth: '280px'
-                    }}>
-                      Risk score reason: Low magnitude RCE/RFI, Backdoor/Trojan attacks targeting many customers
-                    </Typography>
-                  </Box>
-                </Box>
+                    Risk score reason: Low magnitude RCE/RFI, Backdoor/Trojan attacks targeting many customers
+              </Typography>
+            </Box>
               </Box>
             </Grid>
 
@@ -420,23 +412,21 @@ export default function TrustIPAnalytics() {
                   fontWeight: 500,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 0.5,
-                  textTransform: 'uppercase'
+                  gap: 0.5
                 }}>
                   ORIGIN <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
-                </Typography>
-                <Grid container spacing={2}>
+              </Typography>
+              <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
                         <Typography sx={{ 
                           color: '#666',
                           fontSize: '0.75rem',
-                          width: '80px',
-                          fontWeight: 400
+                          width: '80px'
                         }}>
-                          Country
-                        </Typography>
+                    Country
+                  </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography sx={{ fontSize: '0.875rem', color: '#333' }}>Japan</Typography>
                           <Box component="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAALCAYAAAB24g05AAAACXBIWXMAAAsTAAALEwEAmpwYAAABEElEQVQokZXSPUsDQRAG4GcvuUAUFCwEQYJgYaGdWFiIhYiFlX/B0kLwJ1hYiYWFhYVYWFhYiJ2FhYVYCIKFIAhBEEQQgkJAYpFbvdxlL5d44DBvM7Mzu+/uRXEcK0Yd27jBHZbxhBk8Yx8bmMQIVrCFR0wjxTWOsIxpPGAfDQWAKg7QxiD6cYYWtnGPBKNI0UAXhxjDEFbRg0XsIUUZTbygF5c4wQ0qSHCOBvpQ+mHcxTvqmMMNLjCBccQ4xBs2MY8EZZz+BvCXlHGMd8yhimtcYQJ1vOIe42jjDvN/gYsAKQZwhnc0MY0mzjGJUbxhB6NYwyeaWMBcnvGXRHEcJ1jCJnbxhB4MYwdP2MVnl/9fvt2TPzX0NgIAAAAASUVORK5CYII=" sx={{ width: 16, height: 12 }} />
@@ -446,11 +436,10 @@ export default function TrustIPAnalytics() {
                         <Typography sx={{ 
                           color: '#666',
                           fontSize: '0.75rem',
-                          width: '80px',
-                          fontWeight: 400
+                          width: '80px'
                         }}>
-                          ASN
-                        </Typography>
+                    ASN
+                  </Typography>
                         <Typography sx={{ fontSize: '0.875rem', color: '#333' }}>
                           MICROSOFT-CORP-MSN-AS-BLOCK (#8075)
                         </Typography>
@@ -459,14 +448,13 @@ export default function TrustIPAnalytics() {
                         <Typography sx={{ 
                           color: '#666',
                           fontSize: '0.75rem',
-                          width: '80px',
-                          fontWeight: 400
+                          width: '80px'
                         }}>
                           Requests
                         </Typography>
                         <Typography sx={{ fontSize: '0.875rem', color: '#333' }}>
                           656.3K
-                        </Typography>
+                  </Typography>
                       </Box>
                     </Box>
                   </Grid>
@@ -545,7 +533,7 @@ export default function TrustIPAnalytics() {
           <Typography variant="subtitle2" sx={{ 
             mb: 2,
             color: '#666',
-            fontSize: '0.75rem',
+                    fontSize: '0.75rem',
             fontWeight: 500,
             display: 'flex',
             alignItems: 'center',
@@ -743,7 +731,7 @@ export default function TrustIPAnalytics() {
                 </ResponsiveContainer>
               </Box>
             </Box>
-          </Grid>
+        </Grid>
 
           {/* Client Applications */}
           <Grid item xs={12} md={4}>
@@ -757,9 +745,9 @@ export default function TrustIPAnalytics() {
                 color: '#666',
                 fontSize: '0.75rem',
                 fontWeight: 500,
-                display: 'flex',
+              display: 'flex',
                 alignItems: 'center',
-                gap: 0.5
+              gap: 0.5
               }}>
                 Client applications <InfoIcon sx={{ fontSize: '1rem', color: '#999', opacity: 0.7 }} />
               </Typography>
