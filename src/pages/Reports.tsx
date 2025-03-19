@@ -73,6 +73,7 @@ import { loggingService } from '../services/LoggingService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
+import { notificationService } from '../services/NotificationService';
 
 interface ScanReport {
   id: string;
@@ -117,14 +118,13 @@ interface ScheduledReport {
   name: string;
   frequency: 'daily' | 'weekly' | 'monthly';
   type: string;
-  recipients: string[];
+  target: string;
   lastRun: string;
   nextRun: string;
   status: 'active' | 'paused';
   description?: string;
-  target?: string;
-  notification?: boolean;
-  notificationEmail?: string;
+  reminderMinutes: number;
+  notificationEnabled: boolean;
 }
 
 interface ComprehensiveReport {
@@ -578,15 +578,15 @@ export default function Reports() {
   const [editingSchedule, setEditingSchedule] = useState<ScheduledReport | null>(null);
   const [scheduleForm, setScheduleForm] = useState({
     name: '',
-    frequency: 'weekly',
     type: 'vulnerability',
-    recipients: [''],
-    startDate: new Date(),
-    endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-    description: '',
     target: '',
-    notification: true,
-    notificationEmail: '',
+    frequency: 'weekly',
+    description: '',
+    status: 'active' as 'active' | 'paused',
+    reminderMinutes: 30,
+    notificationEnabled: true,
+    startDate: new Date(),
+    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
   const [scheduleFormErrors, setScheduleFormErrors] = useState<{[key: string]: string}>({});
 
@@ -897,15 +897,15 @@ export default function Reports() {
   const handleScheduleReport = () => {
     setScheduleForm({
       name: '',
-      frequency: 'weekly',
       type: 'vulnerability',
-      recipients: [''],
-      startDate: new Date(),
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      description: '',
       target: '',
-      notification: true,
-      notificationEmail: '',
+      frequency: 'weekly',
+      description: '',
+      status: 'active' as 'active' | 'paused',
+      reminderMinutes: 30,
+      notificationEnabled: true,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
     setEditingSchedule(null);
     setScheduleDialogOpen(true);
@@ -914,15 +914,15 @@ export default function Reports() {
   const handleEditSchedule = (report: ScheduledReport) => {
     setScheduleForm({
       name: report.name,
-      frequency: report.frequency,
       type: report.type,
-      recipients: report.recipients,
+      target: report.target,
+      frequency: report.frequency,
+      description: report.description || '',
+      status: report.status,
+      reminderMinutes: report.reminderMinutes,
+      notificationEnabled: report.notificationEnabled,
       startDate: new Date(report.lastRun),
       endDate: new Date(report.nextRun),
-      description: report.description || '',
-      target: report.target || '',
-      notification: report.notification || true,
-      notificationEmail: report.notificationEmail || '',
     });
     setEditingSchedule(report);
     setScheduleDialogOpen(true);
@@ -943,9 +943,6 @@ export default function Reports() {
     if (!scheduleForm.target.trim()) {
       errors.target = 'Target is required';
     }
-    if (scheduleForm.notification && !scheduleForm.notificationEmail.trim()) {
-      errors.notificationEmail = 'Email is required for notifications';
-    }
     if (scheduleForm.startDate >= scheduleForm.endDate) {
       errors.dates = 'End date must be after start date';
     }
@@ -962,22 +959,32 @@ export default function Reports() {
     const newSchedule: ScheduledReport = {
       id: editingSchedule ? editingSchedule.id : `sr-${Date.now()}`,
       name: scheduleForm.name,
-      frequency: scheduleForm.frequency,
       type: scheduleForm.type,
-      recipients: [scheduleForm.notificationEmail],
+      target: scheduleForm.target,
+      frequency: scheduleForm.frequency as 'daily' | 'weekly' | 'monthly',
       lastRun: scheduleForm.startDate.toISOString(),
       nextRun: scheduleForm.endDate.toISOString(),
-      status: 'active',
+      status: scheduleForm.status,
       description: scheduleForm.description,
-      target: scheduleForm.target,
-      notification: scheduleForm.notification,
-      notificationEmail: scheduleForm.notificationEmail,
+      reminderMinutes: scheduleForm.reminderMinutes,
+      notificationEnabled: scheduleForm.notificationEnabled,
     };
+
+    if (scheduleForm.notificationEnabled) {
+      notificationService.scheduleLocalNotification(newSchedule);
+      
+      // Show immediate confirmation
+      notificationService.showBrowserNotification('Report Scheduled', {
+        body: `Your report "${newSchedule.name}" has been scheduled successfully.`,
+        requireInteraction: false,
+      });
+    }
 
     if (editingSchedule) {
       setScheduledReports(scheduledReports.map(report => 
         report.id === editingSchedule.id ? newSchedule : report
       ));
+      notificationService.updateScheduleNotifications(editingSchedule.id, newSchedule);
       setSnackbarMessage('Schedule updated successfully');
     } else {
       setScheduledReports([...scheduledReports, newSchedule]);
@@ -1339,26 +1346,43 @@ export default function Reports() {
                   </FormControl>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={scheduleForm.notification}
-                        onChange={(e) => setScheduleForm({...scheduleForm, notification: e.target.checked})}
-                      />
-                    }
-                    label="Enable Notifications"
-                  />
-                </Grid>
-                {scheduleForm.notification && (
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Notification Email"
-                      value={scheduleForm.notificationEmail}
-                      onChange={(e) => setScheduleForm({...scheduleForm, notificationEmail: e.target.value})}
-                      error={!!scheduleFormErrors.notificationEmail}
-                      helperText={scheduleFormErrors.notificationEmail}
+                  <FormControl fullWidth>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={scheduleForm.notificationEnabled}
+                          onChange={(e) => setScheduleForm({
+                            ...scheduleForm,
+                            notificationEnabled: e.target.checked
+                          })}
+                        />
+                      }
+                      label="Enable Browser Notifications"
                     />
+                  </FormControl>
+                </Grid>
+                {scheduleForm.notificationEnabled && (
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Reminder Time</InputLabel>
+                      <Select
+                        value={scheduleForm.reminderMinutes}
+                        label="Reminder Time"
+                        onChange={(e) => setScheduleForm({
+                          ...scheduleForm,
+                          reminderMinutes: Number(e.target.value)
+                        })}
+                      >
+                        <MenuItem value={5}>5 minutes before</MenuItem>
+                        <MenuItem value={15}>15 minutes before</MenuItem>
+                        <MenuItem value={30}>30 minutes before</MenuItem>
+                        <MenuItem value={60}>1 hour before</MenuItem>
+                        <MenuItem value={1440}>1 day before</MenuItem>
+                      </Select>
+                      <FormHelperText>
+                        When to show the notification before the report runs
+                      </FormHelperText>
+                    </FormControl>
                   </Grid>
                 )}
                 <Grid item xs={12} sm={6}>
