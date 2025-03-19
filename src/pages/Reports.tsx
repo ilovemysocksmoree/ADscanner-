@@ -121,6 +121,10 @@ interface ScheduledReport {
   lastRun: string;
   nextRun: string;
   status: 'active' | 'paused';
+  description?: string;
+  target?: string;
+  notification?: boolean;
+  notificationEmail?: string;
 }
 
 interface ComprehensiveReport {
@@ -570,6 +574,21 @@ export default function Reports() {
   });
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduledReport | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    name: '',
+    frequency: 'weekly',
+    type: 'vulnerability',
+    recipients: [''],
+    startDate: new Date(),
+    endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+    description: '',
+    target: '',
+    notification: true,
+    notificationEmail: '',
+  });
+  const [scheduleFormErrors, setScheduleFormErrors] = useState<{[key: string]: string}>({});
 
   const handleExportClick = (report: ScanReport) => {
     setSelectedReport(report);
@@ -876,18 +895,98 @@ export default function Reports() {
   };
 
   const handleScheduleReport = () => {
-    // Implementation for scheduling reports
-    const newScheduledReport: ScheduledReport = {
-      id: `sr-${scheduledReports.length + 1}`,
-      name: `${reportType} Report`,
+    setScheduleForm({
+      name: '',
       frequency: 'weekly',
-      type: reportType,
-      recipients: [user?.email || ''],
-      lastRun: new Date().toISOString(),
-      nextRun: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      type: 'vulnerability',
+      recipients: [''],
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      description: '',
+      target: '',
+      notification: true,
+      notificationEmail: '',
+    });
+    setEditingSchedule(null);
+    setScheduleDialogOpen(true);
+  };
+
+  const handleEditSchedule = (report: ScheduledReport) => {
+    setScheduleForm({
+      name: report.name,
+      frequency: report.frequency,
+      type: report.type,
+      recipients: report.recipients,
+      startDate: new Date(report.lastRun),
+      endDate: new Date(report.nextRun),
+      description: report.description || '',
+      target: report.target || '',
+      notification: report.notification || true,
+      notificationEmail: report.notificationEmail || '',
+    });
+    setEditingSchedule(report);
+    setScheduleDialogOpen(true);
+  };
+
+  const handleDeleteSchedule = (reportId: string) => {
+    setScheduledReports(scheduledReports.filter(report => report.id !== reportId));
+    setSnackbarMessage('Schedule deleted successfully');
+    setSnackbarOpen(true);
+  };
+
+  const validateScheduleForm = () => {
+    const errors: {[key: string]: string} = {};
+    
+    if (!scheduleForm.name.trim()) {
+      errors.name = 'Name is required';
+    }
+    if (!scheduleForm.target.trim()) {
+      errors.target = 'Target is required';
+    }
+    if (scheduleForm.notification && !scheduleForm.notificationEmail.trim()) {
+      errors.notificationEmail = 'Email is required for notifications';
+    }
+    if (scheduleForm.startDate >= scheduleForm.endDate) {
+      errors.dates = 'End date must be after start date';
+    }
+
+    setScheduleFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleScheduleSubmit = () => {
+    if (!validateScheduleForm()) {
+      return;
+    }
+
+    const newSchedule: ScheduledReport = {
+      id: editingSchedule ? editingSchedule.id : `sr-${Date.now()}`,
+      name: scheduleForm.name,
+      frequency: scheduleForm.frequency,
+      type: scheduleForm.type,
+      recipients: [scheduleForm.notificationEmail],
+      lastRun: scheduleForm.startDate.toISOString(),
+      nextRun: scheduleForm.endDate.toISOString(),
       status: 'active',
+      description: scheduleForm.description,
+      target: scheduleForm.target,
+      notification: scheduleForm.notification,
+      notificationEmail: scheduleForm.notificationEmail,
     };
-    setScheduledReports([...scheduledReports, newScheduledReport]);
+
+    if (editingSchedule) {
+      setScheduledReports(scheduledReports.map(report => 
+        report.id === editingSchedule.id ? newSchedule : report
+      ));
+      setSnackbarMessage('Schedule updated successfully');
+    } else {
+      setScheduledReports([...scheduledReports, newSchedule]);
+      setSnackbarMessage('New schedule created successfully');
+    }
+
+    setScheduleDialogOpen(false);
+    setSnackbarOpen(true);
+    setEditingSchedule(null);
   };
 
   const generateReport = async () => {
@@ -1111,24 +1210,26 @@ export default function Reports() {
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Scheduled Reports
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<ScheduleIcon />}
-                onClick={handleScheduleReport}
-                sx={{ mb: 3 }}
-              >
-                Schedule New Report
-              </Button>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6">
+                  Scheduled Reports
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<ScheduleIcon />}
+                  onClick={handleScheduleReport}
+                >
+                  Schedule New Report
+                </Button>
+              </Box>
               <TableContainer>
                 <Table>
                   <TableHead>
                     <TableRow>
                       <TableCell>Name</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell>Target</TableCell>
                       <TableCell>Frequency</TableCell>
-                      <TableCell>Last Run</TableCell>
                       <TableCell>Next Run</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell align="right">Actions</TableCell>
@@ -1138,8 +1239,9 @@ export default function Reports() {
                     {scheduledReports.map((report) => (
                       <TableRow key={report.id}>
                         <TableCell>{report.name}</TableCell>
+                        <TableCell>{report.type}</TableCell>
+                        <TableCell>{report.target}</TableCell>
                         <TableCell>{report.frequency}</TableCell>
-                        <TableCell>{new Date(report.lastRun).toLocaleString()}</TableCell>
                         <TableCell>{new Date(report.nextRun).toLocaleString()}</TableCell>
                         <TableCell>
                           <Chip
@@ -1149,12 +1251,24 @@ export default function Reports() {
                           />
                         </TableCell>
                         <TableCell align="right">
-                          <IconButton size="small">
-                            <EditIcon />
-                          </IconButton>
-                          <IconButton size="small">
-                            <DeleteIcon />
-                          </IconButton>
+                          <Tooltip title="Edit Schedule">
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleEditSchedule(report)}
+                              sx={{ mr: 1 }}
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete Schedule">
+                            <IconButton 
+                              size="small"
+                              onClick={() => handleDeleteSchedule(report.id)}
+                              color="error"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1163,6 +1277,132 @@ export default function Reports() {
               </TableContainer>
             </Paper>
           </Grid>
+
+          {/* Schedule Form Dialog */}
+          <Dialog 
+            open={scheduleDialogOpen} 
+            onClose={() => setScheduleDialogOpen(false)}
+            maxWidth="md"
+            fullWidth
+          >
+            <DialogTitle>
+              {editingSchedule ? 'Edit Scheduled Report' : 'Schedule New Report'}
+            </DialogTitle>
+            <DialogContent>
+              <Grid container spacing={3} sx={{ mt: 1 }}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Schedule Name"
+                    value={scheduleForm.name}
+                    onChange={(e) => setScheduleForm({...scheduleForm, name: e.target.value})}
+                    error={!!scheduleFormErrors.name}
+                    helperText={scheduleFormErrors.name}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Report Type</InputLabel>
+                    <Select
+                      value={scheduleForm.type}
+                      label="Report Type"
+                      onChange={(e) => setScheduleForm({...scheduleForm, type: e.target.value})}
+                    >
+                      <MenuItem value="vulnerability">Vulnerability Assessment</MenuItem>
+                      <MenuItem value="network">Network Security</MenuItem>
+                      <MenuItem value="system">System Health</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Target System/Network"
+                    value={scheduleForm.target}
+                    onChange={(e) => setScheduleForm({...scheduleForm, target: e.target.value})}
+                    error={!!scheduleFormErrors.target}
+                    helperText={scheduleFormErrors.target}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Frequency</InputLabel>
+                    <Select
+                      value={scheduleForm.frequency}
+                      label="Frequency"
+                      onChange={(e) => setScheduleForm({...scheduleForm, frequency: e.target.value})}
+                    >
+                      <MenuItem value="daily">Daily</MenuItem>
+                      <MenuItem value="weekly">Weekly</MenuItem>
+                      <MenuItem value="monthly">Monthly</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={scheduleForm.notification}
+                        onChange={(e) => setScheduleForm({...scheduleForm, notification: e.target.checked})}
+                      />
+                    }
+                    label="Enable Notifications"
+                  />
+                </Grid>
+                {scheduleForm.notification && (
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Notification Email"
+                      value={scheduleForm.notificationEmail}
+                      onChange={(e) => setScheduleForm({...scheduleForm, notificationEmail: e.target.value})}
+                      error={!!scheduleFormErrors.notificationEmail}
+                      helperText={scheduleFormErrors.notificationEmail}
+                    />
+                  </Grid>
+                )}
+                <Grid item xs={12} sm={6}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <DateTimePicker
+                      label="Start Date"
+                      value={scheduleForm.startDate}
+                      onChange={(newValue) => newValue && setScheduleForm({...scheduleForm, startDate: newValue})}
+                    />
+                  </LocalizationProvider>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <DateTimePicker
+                      label="End Date"
+                      value={scheduleForm.endDate}
+                      onChange={(newValue) => newValue && setScheduleForm({...scheduleForm, endDate: newValue})}
+                    />
+                  </LocalizationProvider>
+                </Grid>
+                {scheduleFormErrors.dates && (
+                  <Grid item xs={12}>
+                    <Alert severity="error">{scheduleFormErrors.dates}</Alert>
+                  </Grid>
+                )}
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Description"
+                    multiline
+                    rows={4}
+                    value={scheduleForm.description}
+                    onChange={(e) => setScheduleForm({...scheduleForm, description: e.target.value})}
+                  />
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setScheduleDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleScheduleSubmit} variant="contained">
+                {editingSchedule ? 'Update Schedule' : 'Create Schedule'}
+              </Button>
+            </DialogActions>
+          </Dialog>
         </Grid>
       )}
 
