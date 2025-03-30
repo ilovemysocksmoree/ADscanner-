@@ -233,7 +233,7 @@ export default function NetworkScanner() {
   const [alerts, setAlerts] = useState<NetworkAlert[]>(mockNetworkAlerts);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [selectedTab, setSelectedTab] = useState(0);
+  const [selectedTab, setSelectedTab] = useState(1);
   const [darkMode, setDarkMode] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -560,106 +560,116 @@ export default function NetworkScanner() {
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={selectedTab} onChange={handleTabChange} aria-label="network analysis tabs">
-          <Tab label="Network Scan" icon={<NetworkCheckIcon />} {...a11yProps(0)} />
+          {file && showDetailedResults && (
+            <Tab label="Network Scan" icon={<NetworkCheckIcon />} {...a11yProps(0)} />
+          )}
           <Tab label="Protocol Analysis" icon={<AssessmentIcon />} {...a11yProps(1)} />
-          <Tab label="Endpoint Analysis" icon={<ComputerIcon />} {...a11yProps(2)} />
-          <Tab label="Application Analysis" icon={<AppsIcon />} {...a11yProps(3)} />
+          {file && showDetailedResults && (
+            <>
+              <Tab label="Endpoint Analysis" icon={<ComputerIcon />} {...a11yProps(2)} />
+              <Tab label="Application Analysis" icon={<AppsIcon />} {...a11yProps(3)} />
+            </>
+          )}
         </Tabs>
       </Box>
 
-      <TabPanel value={selectedTab} index={0}>
-        {/* Network Scan Configuration */}
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Network Scan Configuration
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Network Range (CIDR)"
-                    value={networkRange}
-                    onChange={(e) => setNetworkRange(e.target.value)}
-                    disabled={isScanning}
-                    helperText="Example: 192.168.1.0/24"
-                  />
+      {/* Only show Network Scan tab panel if file is uploaded and analyzed */}
+      {file && showDetailedResults && (
+        <TabPanel value={selectedTab} index={0}>
+          {/* Network Scan Configuration */}
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Network Scan Configuration
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Network Range (CIDR)"
+                      value={networkRange}
+                      onChange={(e) => setNetworkRange(e.target.value)}
+                      disabled={isScanning}
+                      helperText="Example: 192.168.1.0/24"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      variant="contained"
+                      color={isScanning ? 'error' : 'primary'}
+                      startIcon={isScanning ? <StopIcon /> : <StartIcon />}
+                      onClick={isScanning ? handleStopScan : handleStartScan}
+                      sx={{ mr: 2 }}
+                    >
+                      {isScanning ? 'Stop Scan' : 'Start Network Scan'}
+                    </Button>
+                  </Grid>
                 </Grid>
-                <Grid item xs={12}>
-                  <Button
-                    variant="contained"
-                    color={isScanning ? 'error' : 'primary'}
-                    startIcon={isScanning ? <StopIcon /> : <StartIcon />}
-                    onClick={isScanning ? handleStopScan : handleStartScan}
-                    sx={{ mr: 2 }}
-                  >
-                    {isScanning ? 'Stop Scan' : 'Start Network Scan'}
-                  </Button>
-                </Grid>
-              </Grid>
-            </Paper>
-          </Grid>
+              </Paper>
+            </Grid>
 
-          {/* Scan Results */}
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Discovered Devices
-              </Typography>
-              {isScanning ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <List>
-                  {devices.map((device, index) => (
-                    <div key={device.ip}>
-                      <ListItem>
-                        <ListItemIcon>
-                          {device.type === 'router' ? (
-                            <RouterIcon color="primary" />
-                          ) : (
-                            <ComputerIcon color="primary" />
-                          )}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="subtitle1">{device.hostname}</Typography>
-                              <Chip label={device.ip} size="small" variant="outlined" />
-                            </Box>
-                          }
-                          secondary={
-                            <Box sx={{ mt: 1 }}>
-                              <Typography variant="subtitle2" gutterBottom>
-                                Open Services:
-                              </Typography>
-                              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                {device.services.map((service) => (
-                                  <Chip
-                                    key={service.port}
-                                    label={`${service.name} (${service.port})`}
-                                    size="small"
-                                    color="primary"
-                                    variant="outlined"
-                                  />
-                                ))}
+            {/* Scan Results */}
+            <Grid item xs={12}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Discovered Devices
+                </Typography>
+                {isScanning ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <List>
+                    {devices.map((device, index) => (
+                      <div key={device.ip}>
+                        <ListItem>
+                          <ListItemIcon>
+                            {device.type === 'router' ? (
+                              <RouterIcon color="primary" />
+                            ) : (
+                              <ComputerIcon color="primary" />
+                            )}
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="subtitle1">{device.hostname}</Typography>
+                                <Chip label={device.ip} size="small" variant="outlined" />
                               </Box>
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                      {index < devices.length - 1 && <Divider />}
-                    </div>
-                  ))}
-                </List>
-              )}
-            </Paper>
+                            }
+                            secondary={
+                              <Box sx={{ mt: 1 }}>
+                                <Typography variant="subtitle2" gutterBottom>
+                                  Open Services:
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                  {device.services.map((service) => (
+                                    <Chip
+                                      key={service.port}
+                                      label={`${service.name} (${service.port})`}
+                                      size="small"
+                                      color="primary"
+                                      variant="outlined"
+                                    />
+                                  ))}
+                                </Box>
+                              </Box>
+                            }
+                          />
+                        </ListItem>
+                        {index < devices.length - 1 && <Divider />}
+                      </div>
+                    ))}
+                  </List>
+                )}
+              </Paper>
+            </Grid>
           </Grid>
-        </Grid>
-      </TabPanel>
+        </TabPanel>
+      )}
 
+      {/* Protocol Analysis tab panel is always visible */}
       <TabPanel value={selectedTab} index={1}>
         <Grid container spacing={3}>
           <Grid item xs={12}>
@@ -802,547 +812,552 @@ export default function NetworkScanner() {
         </Grid>
       </TabPanel>
 
-      <TabPanel value={selectedTab} index={2}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3, mb: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Network Traffic Overview
-                </Typography>
-                <Tooltip title="Comprehensive view of network traffic patterns">
-                  <IconButton size="small" sx={{ ml: 1 }}>
-                    <InfoIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-              <Box sx={{ height: 400 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={analysisResults.endpoints}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                    <XAxis 
-                      dataKey="ip" 
-                      stroke="#666"
-                      tick={{ fill: '#666' }}
-                    />
-                    <YAxis 
-                      stroke="#666"
-                      tick={{ fill: '#666' }}
-                    />
-                    <RechartsTooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }}
-                    />
-                    <Legend 
-                      verticalAlign="top" 
-                      height={36}
-                      iconType="circle"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="packetsIn" 
-                      name="Inbound Packets"
-                      stroke="#4CAF50"
-                      strokeWidth={2}
-                      dot={{ fill: '#4CAF50', strokeWidth: 2 }}
-                      activeDot={{ r: 6 }}
-                      isAnimationActive={true}
-                      animationBegin={0}
-                      animationDuration={1500}
-                      animationEasing="ease-in-out"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="packetsOut" 
-                      name="Outbound Packets"
-                      stroke="#2196F3"
-                      strokeWidth={2}
-                      dot={{ fill: '#2196F3', strokeWidth: 2 }}
-                      activeDot={{ r: 6 }}
-                      isAnimationActive={true}
-                      animationBegin={200}
-                      animationDuration={1500}
-                      animationEasing="ease-in-out"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Box>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} lg={8}>
-            <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="h6" gutterBottom>
-                    Data Transfer Analysis
-                  </Typography>
-                  <Tooltip title="Detailed view of data transfer patterns">
-                    <IconButton size="small" sx={{ ml: 1 }}>
-                      <InfoIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <TextField
-                    select
-                    size="small"
-                    label="Time Range"
-                    value="1h"
-                    sx={{ minWidth: 120 }}
-                  >
-                    <MenuItem value="1h">Last Hour</MenuItem>
-                    <MenuItem value="6h">Last 6 Hours</MenuItem>
-                    <MenuItem value="24h">Last 24 Hours</MenuItem>
-                    <MenuItem value="7d">Last 7 Days</MenuItem>
-                  </TextField>
-                  <TextField
-                    select
-                    size="small"
-                    label="Top IPs"
-                    value="10"
-                    sx={{ minWidth: 120 }}
-                  >
-                    <MenuItem value="10">Top 10</MenuItem>
-                    <MenuItem value="20">Top 20</MenuItem>
-                    <MenuItem value="50">Top 50</MenuItem>
-                    <MenuItem value="100">Top 100</MenuItem>
-                  </TextField>
-                  <TextField
-                    select
-                    size="small"
-                    label="Group By"
-                    value="ip"
-                    sx={{ minWidth: 120 }}
-                  >
-                    <MenuItem value="ip">IP Address</MenuItem>
-                    <MenuItem value="subnet">Subnet</MenuItem>
-                    <MenuItem value="department">Department</MenuItem>
-                    <MenuItem value="location">Location</MenuItem>
-                  </TextField>
-                </Box>
-              </Box>
-
-              <Box sx={{ height: 400 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={analysisResults.endpoints}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <defs>
-                      <linearGradient id="inboundGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8E24AA" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#8E24AA" stopOpacity={0.1}/>
-                      </linearGradient>
-                      <linearGradient id="outboundGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00ACC1" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#00ACC1" stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid 
-                      strokeDasharray="3 3" 
-                      stroke="#eee" 
-                      vertical={false}
-                    />
-                    <XAxis 
-                      dataKey="ip"
-                      stroke="#666"
-                      tick={{ fill: '#666' }}
-                      axisLine={{ stroke: '#eee' }}
-                      interval={0}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis 
-                      stroke="#666"
-                      tick={{ fill: '#666' }}
-                      tickFormatter={(value) => `${(value / 1024 / 1024).toFixed(1)} MB`}
-                      axisLine={{ stroke: '#eee' }}
-                    />
-                    <RechartsTooltip
-                      contentStyle={{ 
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                      }}
-                      formatter={(value: number) => [`${(value / 1024 / 1024).toFixed(2)} MB`, '']}
-                      labelStyle={{ color: '#666' }}
-                    />
-                    <Legend 
-                      verticalAlign="top" 
-                      height={36}
-                      iconType="circle"
-                      wrapperStyle={{
-                        paddingBottom: '20px'
-                      }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="bytesIn" 
-                      name="Inbound Data"
-                      stroke="#8E24AA"
-                      strokeWidth={2}
-                      fill="url(#inboundGradient)"
-                      isAnimationActive={true}
-                      animationBegin={0}
-                      animationDuration={1500}
-                      animationEasing="ease-in-out"
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="bytesOut" 
-                      name="Outbound Data"
-                      stroke="#00ACC1"
-                      strokeWidth={2}
-                      fill="url(#outboundGradient)"
-                      isAnimationActive={true}
-                      animationBegin={200}
-                      animationDuration={1500}
-                      animationEasing="ease-in-out"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </Box>
-
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Quick Stats
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Total Active IPs
-                      </Typography>
-                      <Typography variant="h6">
-                        2,547
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Peak Traffic
-                      </Typography>
-                      <Typography variant="h6">
-                        847 MB/s
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Active Subnets
-                      </Typography>
-                      <Typography variant="h6">
-                        18
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Anomaly Score
-                      </Typography>
-                      <Typography variant="h6" color="success.main">
-                        Low
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                </Grid>
-              </Box>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} lg={4}>
-            <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Traffic Distribution
-                </Typography>
-                <Tooltip title="Distribution of network traffic across endpoints">
-                  <IconButton size="small" sx={{ ml: 1 }}>
-                    <InfoIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-              <Box sx={{ height: 400 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={analysisResults.endpoints.map(endpoint => ({
-                        name: endpoint.ip,
-                        value: endpoint.bytesIn + endpoint.bytesOut
-                      }))}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                      isAnimationActive={true}
-                      animationBegin={0}
-                      animationDuration={1500}
-                      animationEasing="ease-in-out"
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      labelLine={false}
-                    >
-                      {analysisResults.endpoints.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={COLORS[index % COLORS.length]}
-                          strokeWidth={2}
+      {/* Only show Endpoint and Application Analysis tab panels if file is uploaded and analyzed */}
+      {file && showDetailedResults && (
+        <>
+          <TabPanel value={selectedTab} index={2}>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3, mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Network Traffic Overview
+                    </Typography>
+                    <Tooltip title="Comprehensive view of network traffic patterns">
+                      <IconButton size="small" sx={{ ml: 1 }}>
+                        <InfoIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <Box sx={{ height: 400 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={analysisResults.endpoints}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis 
+                          dataKey="ip" 
+                          stroke="#666"
+                          tick={{ fill: '#666' }}
                         />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip
-                      contentStyle={{ 
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }}
-                      formatter={(value) => `${(value / 1024).toFixed(2)} KB`}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Box>
-            </Paper>
-          </Grid>
+                        <YAxis 
+                          stroke="#666"
+                          tick={{ fill: '#666' }}
+                        />
+                        <RechartsTooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            border: 'none',
+                            borderRadius: '4px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
+                        />
+                        <Legend 
+                          verticalAlign="top" 
+                          height={36}
+                          iconType="circle"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="packetsIn" 
+                          name="Inbound Packets"
+                          stroke="#4CAF50"
+                          strokeWidth={2}
+                          dot={{ fill: '#4CAF50', strokeWidth: 2 }}
+                          activeDot={{ r: 6 }}
+                          isAnimationActive={true}
+                          animationBegin={0}
+                          animationDuration={1500}
+                          animationEasing="ease-in-out"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="packetsOut" 
+                          name="Outbound Packets"
+                          stroke="#2196F3"
+                          strokeWidth={2}
+                          dot={{ fill: '#2196F3', strokeWidth: 2 }}
+                          activeDot={{ r: 6 }}
+                          isAnimationActive={true}
+                          animationBegin={200}
+                          animationDuration={1500}
+                          animationEasing="ease-in-out"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Paper>
+              </Grid>
 
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Detailed Statistics
-                </Typography>
-                <Tooltip title="Comprehensive endpoint traffic statistics">
-                  <IconButton size="small" sx={{ ml: 1 }}>
-                    <InfoIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold' }}>IP Address</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Packets In</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Packets Out</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Data In</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Data Out</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total Traffic</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {analysisResults.endpoints.map((endpoint) => {
-                      const totalBytes = endpoint.bytesIn + endpoint.bytesOut;
-                      const isHighTraffic = totalBytes > 300000;
-                      return (
-                        <TableRow 
-                          key={endpoint.ip}
-                          sx={{ '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
+              <Grid item xs={12} lg={8}>
+                <Paper sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Typography variant="h6" gutterBottom>
+                        Data Transfer Analysis
+                      </Typography>
+                      <Tooltip title="Detailed view of data transfer patterns">
+                        <IconButton size="small" sx={{ ml: 1 }}>
+                          <InfoIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField
+                        select
+                        size="small"
+                        label="Time Range"
+                        value="1h"
+                        sx={{ minWidth: 120 }}
+                      >
+                        <MenuItem value="1h">Last Hour</MenuItem>
+                        <MenuItem value="6h">Last 6 Hours</MenuItem>
+                        <MenuItem value="24h">Last 24 Hours</MenuItem>
+                        <MenuItem value="7d">Last 7 Days</MenuItem>
+                      </TextField>
+                      <TextField
+                        select
+                        size="small"
+                        label="Top IPs"
+                        value="10"
+                        sx={{ minWidth: 120 }}
+                      >
+                        <MenuItem value="10">Top 10</MenuItem>
+                        <MenuItem value="20">Top 20</MenuItem>
+                        <MenuItem value="50">Top 50</MenuItem>
+                        <MenuItem value="100">Top 100</MenuItem>
+                      </TextField>
+                      <TextField
+                        select
+                        size="small"
+                        label="Group By"
+                        value="ip"
+                        sx={{ minWidth: 120 }}
+                      >
+                        <MenuItem value="ip">IP Address</MenuItem>
+                        <MenuItem value="subnet">Subnet</MenuItem>
+                        <MenuItem value="department">Department</MenuItem>
+                        <MenuItem value="location">Location</MenuItem>
+                      </TextField>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ height: 400 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart
+                        data={analysisResults.endpoints}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <defs>
+                          <linearGradient id="inboundGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#8E24AA" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#8E24AA" stopOpacity={0.1}/>
+                          </linearGradient>
+                          <linearGradient id="outboundGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#00ACC1" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#00ACC1" stopOpacity={0.1}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid 
+                          strokeDasharray="3 3" 
+                          stroke="#eee" 
+                          vertical={false}
+                        />
+                        <XAxis 
+                          dataKey="ip"
+                          stroke="#666"
+                          tick={{ fill: '#666' }}
+                          axisLine={{ stroke: '#eee' }}
+                          interval={0}
+                          angle={-45}
+                          textAnchor="end"
+                          height={60}
+                        />
+                        <YAxis 
+                          stroke="#666"
+                          tick={{ fill: '#666' }}
+                          tickFormatter={(value) => `${(value / 1024 / 1024).toFixed(1)} MB`}
+                          axisLine={{ stroke: '#eee' }}
+                        />
+                        <RechartsTooltip
+                          contentStyle={{ 
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            border: 'none',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                          }}
+                          formatter={(value: number) => [`${(value / 1024 / 1024).toFixed(2)} MB`, '']}
+                          labelStyle={{ color: '#666' }}
+                        />
+                        <Legend 
+                          verticalAlign="top" 
+                          height={36}
+                          iconType="circle"
+                          wrapperStyle={{
+                            paddingBottom: '20px'
+                          }}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="bytesIn" 
+                          name="Inbound Data"
+                          stroke="#8E24AA"
+                          strokeWidth={2}
+                          fill="url(#inboundGradient)"
+                          isAnimationActive={true}
+                          animationBegin={0}
+                          animationDuration={1500}
+                          animationEasing="ease-in-out"
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="bytesOut" 
+                          name="Outbound Data"
+                          stroke="#00ACC1"
+                          strokeWidth={2}
+                          fill="url(#outboundGradient)"
+                          isAnimationActive={true}
+                          animationBegin={200}
+                          animationDuration={1500}
+                          animationEasing="ease-in-out"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </Box>
+
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Quick Stats
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Total Active IPs
+                          </Typography>
+                          <Typography variant="h6">
+                            2,547
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Peak Traffic
+                          </Typography>
+                          <Typography variant="h6">
+                            847 MB/s
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Active Subnets
+                          </Typography>
+                          <Typography variant="h6">
+                            18
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Anomaly Score
+                          </Typography>
+                          <Typography variant="h6" color="success.main">
+                            Low
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} lg={4}>
+                <Paper sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Traffic Distribution
+                    </Typography>
+                    <Tooltip title="Distribution of network traffic across endpoints">
+                      <IconButton size="small" sx={{ ml: 1 }}>
+                        <InfoIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <Box sx={{ height: 400 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={analysisResults.endpoints.map(endpoint => ({
+                            name: endpoint.ip,
+                            value: endpoint.bytesIn + endpoint.bytesOut
+                          }))}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          paddingAngle={5}
+                          dataKey="value"
+                          isAnimationActive={true}
+                          animationBegin={0}
+                          animationDuration={1500}
+                          animationEasing="ease-in-out"
+                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                          labelLine={false}
                         >
-                          <TableCell sx={{ fontWeight: 500 }}>{endpoint.ip}</TableCell>
-                          <TableCell align="right">{endpoint.packetsIn.toLocaleString()}</TableCell>
-                          <TableCell align="right">{endpoint.packetsOut.toLocaleString()}</TableCell>
-                          <TableCell align="right">{(endpoint.bytesIn / 1024).toFixed(2)} KB</TableCell>
-                          <TableCell align="right">{(endpoint.bytesOut / 1024).toFixed(2)} KB</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 500 }}>
-                            {(totalBytes / 1024).toFixed(2)} KB
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              size="small"
-                              color={isHighTraffic ? 'warning' : 'success'}
-                              label={isHighTraffic ? 'High Traffic' : 'Normal'}
-                              sx={{ 
-                                fontWeight: 500,
-                                minWidth: 85,
-                                '& .MuiChip-label': { px: 2 }
-                              }}
+                          {analysisResults.endpoints.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={COLORS[index % COLORS.length]}
+                              strokeWidth={2}
                             />
-                          </TableCell>
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          contentStyle={{ 
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            border: 'none',
+                            borderRadius: '4px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
+                          formatter={(value) => `${(value / 1024).toFixed(2)} KB`}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Detailed Statistics
+                    </Typography>
+                    <Tooltip title="Comprehensive endpoint traffic statistics">
+                      <IconButton size="small" sx={{ ml: 1 }}>
+                        <InfoIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 'bold' }}>IP Address</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold' }}>Packets In</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold' }}>Packets Out</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold' }}>Data In</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold' }}>Data Out</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total Traffic</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-          </Grid>
-        </Grid>
-      </TabPanel>
+                      </TableHead>
+                      <TableBody>
+                        {analysisResults.endpoints.map((endpoint) => {
+                          const totalBytes = endpoint.bytesIn + endpoint.bytesOut;
+                          const isHighTraffic = totalBytes > 300000;
+                          return (
+                            <TableRow 
+                              key={endpoint.ip}
+                              sx={{ '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
+                            >
+                              <TableCell sx={{ fontWeight: 500 }}>{endpoint.ip}</TableCell>
+                              <TableCell align="right">{endpoint.packetsIn.toLocaleString()}</TableCell>
+                              <TableCell align="right">{endpoint.packetsOut.toLocaleString()}</TableCell>
+                              <TableCell align="right">{(endpoint.bytesIn / 1024).toFixed(2)} KB</TableCell>
+                              <TableCell align="right">{(endpoint.bytesOut / 1024).toFixed(2)} KB</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 500 }}>
+                                {(totalBytes / 1024).toFixed(2)} KB
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  size="small"
+                                  color={isHighTraffic ? 'warning' : 'success'}
+                                  label={isHighTraffic ? 'High Traffic' : 'Normal'}
+                                  sx={{ 
+                                    fontWeight: 500,
+                                    minWidth: 85,
+                                    '& .MuiChip-label': { px: 2 }
+                                  }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Paper>
+              </Grid>
+            </Grid>
+          </TabPanel>
 
-      <TabPanel value={selectedTab} index={3}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} lg={6}>
-            <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Application Layer Traffic
-                </Typography>
-                <Tooltip title="Real-time application protocol usage">
-                  <IconButton size="small" sx={{ ml: 1 }}>
-                    <InfoIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-              <Box sx={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={applicationTimeData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="time"
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis />
-                    <RechartsTooltip />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="HTTP" 
-                      stroke="#8884d8"
-                      isAnimationActive={true}
-                      animationBegin={0}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
-                      dot={false}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="DNS" 
-                      stroke="#82ca9d"
-                      isAnimationActive={true}
-                      animationBegin={200}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
-                      dot={false}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="SMB" 
-                      stroke="#ffc658"
-                      isAnimationActive={true}
-                      animationBegin={400}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
-                      dot={false}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="FTP" 
-                      stroke="#ff7300"
-                      isAnimationActive={true}
-                      animationBegin={600}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Box>
-            </Paper>
-          </Grid>
+          <TabPanel value={selectedTab} index={3}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} lg={6}>
+                <Paper sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Application Layer Traffic
+                    </Typography>
+                    <Tooltip title="Real-time application protocol usage">
+                      <IconButton size="small" sx={{ ml: 1 }}>
+                        <InfoIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={applicationTimeData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="time"
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Line 
+                          type="monotone" 
+                          dataKey="HTTP" 
+                          stroke="#8884d8"
+                          isAnimationActive={true}
+                          animationBegin={0}
+                          animationDuration={1000}
+                          animationEasing="ease-out"
+                          dot={false}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="DNS" 
+                          stroke="#82ca9d"
+                          isAnimationActive={true}
+                          animationBegin={200}
+                          animationDuration={1000}
+                          animationEasing="ease-out"
+                          dot={false}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="SMB" 
+                          stroke="#ffc658"
+                          isAnimationActive={true}
+                          animationBegin={400}
+                          animationDuration={1000}
+                          animationEasing="ease-out"
+                          dot={false}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="FTP" 
+                          stroke="#ff7300"
+                          isAnimationActive={true}
+                          animationBegin={600}
+                          animationDuration={1000}
+                          animationEasing="ease-out"
+                          dot={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Paper>
+              </Grid>
 
-          <Grid item xs={12} lg={6}>
-            <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Application Distribution
-                </Typography>
-                <Tooltip title="Distribution of application protocols">
-                  <IconButton size="small" sx={{ ml: 1 }}>
-                    <InfoIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-              <Box sx={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={analysisResults.applications}
-                      dataKey="bytesTransferred"
-                      nameKey="application"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      isAnimationActive={true}
-                      animationBegin={0}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
-                    >
-                      {analysisResults.applications.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Box>
-            </Paper>
-          </Grid>
+              <Grid item xs={12} lg={6}>
+                <Paper sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Application Distribution
+                    </Typography>
+                    <Tooltip title="Distribution of application protocols">
+                      <IconButton size="small" sx={{ ml: 1 }}>
+                        <InfoIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={analysisResults.applications}
+                          dataKey="bytesTransferred"
+                          nameKey="application"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={100}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          isAnimationActive={true}
+                          animationBegin={0}
+                          animationDuration={1000}
+                          animationEasing="ease-out"
+                        >
+                          {analysisResults.applications.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Paper>
+              </Grid>
 
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Application Layer Statistics
-                </Typography>
-                <Tooltip title="Detailed application protocol statistics">
-                  <IconButton size="small" sx={{ ml: 1 }}>
-                    <InfoIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Application</TableCell>
-                      <TableCell align="right">Connections</TableCell>
-                      <TableCell align="right">Bytes Transferred</TableCell>
-                      <TableCell align="right">% of Total Traffic</TableCell>
-                      <TableCell>Status</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {analysisResults.applications.map((app) => {
-                      const totalBytes = analysisResults.applications.reduce((acc, curr) => acc + curr.bytesTransferred, 0);
-                      const percentage = ((app.bytesTransferred / totalBytes) * 100).toFixed(1);
-                      const isHighUsage = app.connections > 300;
-                      return (
-                        <TableRow key={app.application}>
-                          <TableCell>{app.application}</TableCell>
-                          <TableCell align="right">{app.connections.toLocaleString()}</TableCell>
-                          <TableCell align="right">{(app.bytesTransferred / 1024).toFixed(2)} KB</TableCell>
-                          <TableCell align="right">{percentage}%</TableCell>
-                          <TableCell>
-                            <Chip
-                              size="small"
-                              color={isHighUsage ? 'warning' : 'success'}
-                              label={isHighUsage ? 'High Usage' : 'Normal'}
-                            />
-                          </TableCell>
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Application Layer Statistics
+                    </Typography>
+                    <Tooltip title="Detailed application protocol statistics">
+                      <IconButton size="small" sx={{ ml: 1 }}>
+                        <InfoIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Application</TableCell>
+                          <TableCell align="right">Connections</TableCell>
+                          <TableCell align="right">Bytes Transferred</TableCell>
+                          <TableCell align="right">% of Total Traffic</TableCell>
+                          <TableCell>Status</TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-          </Grid>
-        </Grid>
-      </TabPanel>
+                      </TableHead>
+                      <TableBody>
+                        {analysisResults.applications.map((app) => {
+                          const totalBytes = analysisResults.applications.reduce((acc, curr) => acc + curr.bytesTransferred, 0);
+                          const percentage = ((app.bytesTransferred / totalBytes) * 100).toFixed(1);
+                          const isHighUsage = app.connections > 300;
+                          return (
+                            <TableRow key={app.application}>
+                              <TableCell>{app.application}</TableCell>
+                              <TableCell align="right">{app.connections.toLocaleString()}</TableCell>
+                              <TableCell align="right">{(app.bytesTransferred / 1024).toFixed(2)} KB</TableCell>
+                              <TableCell align="right">{percentage}%</TableCell>
+                              <TableCell>
+                                <Chip
+                                  size="small"
+                                  color={isHighUsage ? 'warning' : 'success'}
+                                  label={isHighUsage ? 'High Usage' : 'Normal'}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Paper>
+              </Grid>
+            </Grid>
+          </TabPanel>
+        </>
+      )}
 
       <Snackbar
         open={snackbarOpen}
