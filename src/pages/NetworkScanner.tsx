@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios, { AxiosResponse } from 'axios'
 import {
   Box,
   Paper,
@@ -297,7 +298,10 @@ export default function NetworkScanner() {
     event.target.value = ''; // Allow re-uploading same file
   };
 
-  const handleAnalyzeFile = () => {
+  const handleAnalyzeFile = async () => {
+    const backendURL: string = '192.168.1.7';
+    const backendPort: number = 4444;
+
     if (!file) {
         setSnackbarMessage('Please upload a PCAP file first.');
         setSnackbarOpen(true);
@@ -309,6 +313,17 @@ export default function NetworkScanner() {
     setAnalysisDetails(null);
     loggingService.addLog(user, 'PCAP_ANALYSIS_START', `Started analysis of PCAP file: ${file.name}`, '/network-scanner');
 
+    const formData: FormData = new FormData()
+    formData.append("pcap_file", file)
+
+
+    const resp: AxiosResponse<any, any> = await axios.post(`http://${backendURL}:${backendPort}/api/v1/scan/pcap`, formData, {
+      headers: {
+        'Content-Type': "multipart/form-data",
+      },
+    })
+
+    console.log(resp)
     // Simulate PCAP analysis
     setTimeout(() => {
       // --- Generate Mock Analysis Details ---
@@ -461,8 +476,8 @@ export default function NetworkScanner() {
   // Effect for real-time chart updates (only when analysis is complete and results shown)
   useEffect(() => {
     // ... (Real-time update logic remains the same, maybe adjust interval)
-    let protocolInterval: NodeJS.Timeout | null = null;
-    let appInterval: NodeJS.Timeout | null = null;
+    let protocolInterval: number | null = null;
+    let appInterval: number | null = null;
 
     if (showDetailedResults && !isAnalyzing) {
       protocolInterval = setInterval(() => {
