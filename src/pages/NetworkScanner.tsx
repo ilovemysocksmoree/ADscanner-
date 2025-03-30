@@ -99,6 +99,7 @@ const loggingService = { // Mock Logging Service
 
 // Constants
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#AF19FF', '#FF5733', '#C70039']; // Added more colors
+const TTL_COLOR = '#FF8042'; // Dedicated color for TTL chart bars
 
 // --- Interfaces ---
 interface ProtocolData {
@@ -726,11 +727,11 @@ export default function NetworkScanner() {
                     </Paper>
                 </Grid>
 
-                 {/* Item 3: TTL Distribution */}
+                 {/* Item 3: TTL Distribution (CHANGED TO HORIZONTAL BAR) */}
                 <Grid item xs={12} md={6} lg={7}>
                     <Paper sx={{ p: { xs: 1, sm: 2 }, height: '100%' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                           <TtlIcon sx={{ mr: 1, color: 'warning.main' }} />
+                           <TtlIcon sx={{ mr: 1, color: TTL_COLOR }} /> {/* Use TTL color */}
                            <Typography variant="h6" component="div">TTL Distribution</Typography>
                            <Tooltip title="Distribution of Time-To-Live (TTL) values observed in packets. Common values are 64, 128, 255.">
                              <IconButton size="small" sx={{ ml: 1 }}> <InfoIcon fontSize="small" /> </IconButton>
@@ -740,13 +741,29 @@ export default function NetworkScanner() {
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
                                     data={analysisResults.ttlDistribution.sort((a,b) => b.count - a.count)} // Sort by count
-                                    margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                                    layout="vertical" // Set layout to vertical (horizontal bars)
+                                    margin={{ top: 5, right: 30, left: 10, bottom: 5 }} // Adjust margins for labels
                                 >
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="ttl" name="TTL Value" tick={{ fontSize: 10 }} />
-                                    <YAxis tickFormatter={(value) => value.toLocaleString()} tick={{ fontSize: 10 }} />
-                                    <RechartsTooltip formatter={(value: number) => [`${value.toLocaleString()} packets`, 'Count']} />
-                                    <Bar dataKey="count" name="Packet Count" fill={COLORS[1]} radius={[5, 5, 0, 0]} />
+                                    {/* Define gradient */}
+                                    <defs>
+                                        <linearGradient id="ttlGradient" x1="0" y1="0" x2="1" y2="0">
+                                            <stop offset="5%" stopColor={TTL_COLOR} stopOpacity={0.8}/>
+                                            <stop offset="95%" stopColor={TTL_COLOR} stopOpacity={0.4}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} /> {/* Only vertical grid lines */}
+                                    {/* X Axis is now the count */}
+                                    <XAxis type="number" tickFormatter={(value) => value.toLocaleString()} tick={{ fontSize: 10 }} />
+                                    {/* Y Axis is now the TTL category */}
+                                    <YAxis type="category" dataKey="ttl" name="TTL Value" width={40} tick={{ fontSize: 10 }} />
+                                    <RechartsTooltip formatter={(value: number) => [`${value.toLocaleString()} packets`, 'Count']} cursor={{ fill: 'rgba(200,200,200,0.1)' }}/>
+                                    <Bar
+                                        dataKey="count"
+                                        name="Packet Count"
+                                        fill="url(#ttlGradient)" // Apply gradient fill
+                                        radius={[0, 5, 5, 0]} // Rounded corners on the right
+                                        barSize={20} // Adjust bar thickness
+                                     />
                                 </BarChart>
                             </ResponsiveContainer>
                          </Box>
@@ -812,7 +829,7 @@ export default function NetworkScanner() {
       {/* Panel 2: Endpoint Analysis */}
       {showDetailedResults && analysisDetails && (
         <TabPanel value={selectedTab} index={2}>
-          {/* ... (Endpoint Analysis content remains largely the same, maybe minor style tweaks) ... */}
+          {/* ... (Endpoint Analysis content remains largely the same) ... */}
            <Grid container spacing={3}>
             {/* Endpoint Traffic Distribution Pie Chart */}
             <Grid item xs={12} md={5}>
@@ -907,7 +924,7 @@ export default function NetworkScanner() {
       {/* Panel 3: Application Analysis */}
       {showDetailedResults && analysisDetails && (
         <TabPanel value={selectedTab} index={3}>
-          {/* ... (Application Analysis content remains largely the same, maybe minor style tweaks) ... */}
+          {/* ... (Application Analysis content remains largely the same) ... */}
            <Grid container spacing={3}>
             {/* Application Layer Traffic Over Time Chart */}
             <Grid item xs={12} md={6}>
