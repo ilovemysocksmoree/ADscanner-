@@ -109,6 +109,49 @@ interface ProtocolData {
     percentage?: number; // Optional as it can be calculated
 }
 
+interface ApiResponseData {
+  application_layer_metrics: {
+      ProtocolStats: {
+          [protocol: string]: { // Dynamic protocol names (e.g., "DNS", "HTTP")
+              Anomalies: { [anomalyType: string]: number };
+              Domains: { [domain: string]: number };
+              PacketCount: number;
+              PayloadSizes: { [payload: string]: number };
+              RequestCount: number;
+              ResponseCount: number;
+          };
+      };
+      TLSStats: {
+          CipherSuites: { [suite: string]: number };
+          Versions: { [version: string]: number };
+          Certificates: number;
+          SNI: { [sni: string]: number };
+      };
+  };
+  description: string;
+  message: string;
+  name: string;
+  network_layer_metrics: {
+      FragmentedPackets: number;
+      IPStats: { [ipAddress: string]: number };
+      ProtocolDist: { [protocol: string]: number };
+      ReassembledFlows: number;
+      TTLStats: { [ttl: string]: number };
+      TotalPacket: number;
+  };
+  status: string;
+  transport_layer_metrics: {
+      InvalidTCPFlags: number;
+      PortStats: { [port: string]: number };
+      Retransmissions: number;
+      StreamData: { [stream: string]: number };
+      TCPConnections: number;
+      TCPPacketCount: number;
+      UDPFloodPorts: { [port: string]: number };
+      UDPPacketCount: number;
+  };
+}
+
 interface EndpointData {
     ip: string;
     packetsIn: number;
@@ -299,7 +342,7 @@ export default function NetworkScanner() {
   };
 
   const handleAnalyzeFile = async () => {
-    const backendURL: string = '192.168.1.7';
+    const backendURL: string = 'localhost';
     const backendPort: number = 4444;
 
     if (!file) {
@@ -316,95 +359,104 @@ export default function NetworkScanner() {
     const formData: FormData = new FormData()
     formData.append("pcap_file", file)
 
+    try {
+        const resp: AxiosResponse<any, any> = await axios.post(`http://${backendURL}:${backendPort}/api/v1/scan/pcap`, formData, {
+            headers: {
+                'Content-Type': "multipart/form-data",
+            },
+        });
 
-    const resp: AxiosResponse<any, any> = await axios.post(`http://${backendURL}:${backendPort}/api/v1/scan/pcap`, formData, {
-      headers: {
-        'Content-Type': "multipart/form-data",
-      },
-    })
+        console.log("API Response:", resp.data);
 
-    console.log(resp)
-    // Simulate PCAP analysis
-    setTimeout(() => {
-      // --- Generate Mock Analysis Details ---
-      const totalPackets = Math.floor(Math.random() * 20000) + 5000;
-      const generatedProtocols = mockProtocolData.map(p => ({...p, count: Math.floor(p.count * (Math.random() * 0.4 + 0.8)) }));
-      const generatedEndpoints = mockEndpointData.map(e => {
-          // Simulate location based on IP type
-          let location: EndpointData['location'] | undefined = undefined;
-          if (e.ip === '8.8.8.8') location = { city: 'Mountain View', country: 'United States', countryCode: 'US' };
-          else if (e.ip === '104.16.132.229') location = { city: 'San Francisco', country: 'United States', countryCode: 'US' };
-          else if (e.ip.startsWith('192.168.')) location = { city: 'Kathmandu', country: 'Nepal', countryCode: 'NP' }; // Internal IPs -> Local
-          else location = { city: 'Unknown', country: 'Unknown', countryCode: 'XX' }; // Default for others
+        if (resp.data) {
+            const apiResponse = resp.data as ApiResponseData;
 
-          return {
-            ...e,
-            packetsIn: Math.floor(e.packetsIn * (Math.random() * 0.4 + 0.8)),
-            packetsOut: Math.floor(e.packetsOut * (Math.random() * 0.4 + 0.8)),
-            bytesIn: Math.floor(e.bytesIn * (Math.random() * 0.4 + 0.8)),
-            bytesOut: Math.floor(e.bytesOut * (Math.random() * 0.4 + 0.8)),
-            location: location, // Add simulated location
-        }});
-      const generatedApplications = mockAppData.map(a => ({ ...a, connections: Math.floor(a.connections * (Math.random() * 0.4 + 0.8)), bytesTransferred: Math.floor(a.bytesTransferred * (Math.random() * 0.4 + 0.8)) }));
+            // Transform data into AnalysisDetails (or your chart-ready format)
+            const transformedAnalysisDetails: AnalysisDetails = {
+                timestamp: new Date().toISOString(), // You might need to get this from the API if available
+                totalPackets: apiResponse.network_layer_metrics.TotalPacket,
+                totalBytes: 0,
+                duration: "00:00:00", 
+                protocols: Object.entries(apiResponse.application_layer_metrics.ProtocolStats).map(([protocol, stats]) => ({
+                    protocol: protocol,
+                    count: stats.PacketCount,
+                })),
+                endpoints: Object.entries(apiResponse.network_layer_metrics.IPStats).map(([ip, count]) => ({
+                    ip: ip,
+                    packetsIn: count, // You might need to calculate these based on your API response
+                    packetsOut: 0, // You might need to calculate these based on your API response
+                    bytesIn: 0, // You might need to calculate these based on your API response
+                    bytesOut: 0, // You might need to calculate these based on your API response
+                    // location: {}, // You'll need to add logic for location if needed
+                })),
+                applications: Object.entries(apiResponse.application_layer_metrics.ProtocolStats).map(([application, stats]) => ({
+                    application: application,
+                    connections: stats.RequestCount + stats.ResponseCount, // Example calculation
+                    bytesTransferred: 0, // You might need to calculate this based on your API response
+                })),
+                ttlDistribution: Object.entries(apiResponse.network_layer_metrics.TTLStats).map(([ttl, count]) => ({
+                    ttl: parseInt(ttl),
+                    count: count,
+                })),
+                topTalkers: [], // You'll need to implement logic to determine top talkers
+                suspiciousActivities: [], // You'll need to implement logic to identify suspicious activities
+            };
 
-      // Simulate TTL Distribution
-      const generatedTtlDistribution: TtlDistributionData[] = [
-          { ttl: 64, count: Math.floor(totalPackets * (Math.random() * 0.2 + 0.4)) }, // ~40-60% have TTL 64
-          { ttl: 128, count: Math.floor(totalPackets * (Math.random() * 0.2 + 0.2)) }, // ~20-40% have TTL 128
-          { ttl: 58, count: Math.floor(totalPackets * (Math.random() * 0.1 + 0.05)) }, // Smaller amounts for others
-          { ttl: 255, count: Math.floor(totalPackets * (Math.random() * 0.05 + 0.02)) },
-          { ttl: 32, count: Math.floor(totalPackets * (Math.random() * 0.05 + 0.01)) },
-      ].filter(ttl => ttl.count > 0); // Filter out zero counts
+            // Calculate totalBytes (example)
+            let totalBytes = 0;
+            transformedAnalysisDetails.endpoints.forEach(endpoint => {
+                // Example: Sum bytes from StreamData if it exists
+                if (apiResponse.transport_layer_metrics.StreamData) {
+                    Object.values(apiResponse.transport_layer_metrics.StreamData).forEach(bytes => {
+                        totalBytes += bytes;
+                    });
+                }
+            });
+            transformedAnalysisDetails.totalBytes = totalBytes;
 
-      const generatedAnalysisDetails: AnalysisDetails = {
-        timestamp: new Date().toISOString(),
-        totalPackets: totalPackets,
-        totalBytes: generatedEndpoints.reduce((sum, e) => sum + e.bytesIn + e.bytesOut, 0),
-        duration: `00:${String(Math.floor(Math.random() * 50) + 10).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`,
-        protocols: generatedProtocols,
-        endpoints: generatedEndpoints,
-        applications: generatedApplications,
-        ttlDistribution: generatedTtlDistribution, // Add TTL data
-        topTalkers: [ // Keep mock top talkers for simplicity
-          { ip: '192.168.1.150', packets: generatedEndpoints.find(e=>e.ip === '192.168.1.150')?.packetsOut || 4100, bytes: '1.5 GB', protocols: ['HTTPS', 'SMB', 'TLS'] },
-          { ip: '192.168.1.100', packets: generatedEndpoints.find(e=>e.ip === '192.168.1.100')?.packetsOut || 1800, bytes: '850 MB', protocols: ['HTTPS', 'DNS', 'TLS'] },
-          { ip: '8.8.8.8', packets: generatedEndpoints.find(e=>e.ip === '8.8.8.8')?.packetsIn || 100, bytes: '100 KB', protocols: ['DNS'] },
-        ],
-        suspiciousActivities: [ // Keep mock suspicious activities
-          { type: 'Port Scan', description: 'Rapid connection attempts to multiple ports from 192.168.1.150', severity: 'high', timestamp: new Date(Date.now() - 60000).toISOString() },
-          { type: 'Data Exfiltration Attempt', description: 'Large outbound data transfer detected from 192.168.1.150 to external IP (104.16.132.229)', severity: 'medium', timestamp: new Date().toISOString() }
-        ]
-      };
-      // --- End Mock Analysis Details ---
+            setAnalysisDetails(transformedAnalysisDetails);
+            setAnalysisResults({
+                protocols: transformedAnalysisDetails.protocols,
+                endpoints: transformedAnalysisDetails.endpoints,
+                applications: transformedAnalysisDetails.applications,
+                ttlDistribution: transformedAnalysisDetails.ttlDistribution,
+            });
 
-      setAnalysisDetails(generatedAnalysisDetails); // Store the full details
-      // Update derived state for direct use in charts/tables
-      setAnalysisResults({
-          protocols: generatedAnalysisDetails.protocols,
-          endpoints: generatedAnalysisDetails.endpoints,
-          applications: generatedAnalysisDetails.applications,
-          ttlDistribution: generatedAnalysisDetails.ttlDistribution,
-      });
-      setIsAnalyzing(false);
-      setShowDetailedResults(true); // IMPORTANT: Show the results tabs/panels
-      setSnackbarMessage(`PCAP file "${file.name}" analysis completed successfully.`);
-      setSnackbarOpen(true);
-      loggingService.addLog(user, 'PCAP_ANALYSIS_COMPLETE', `Completed analysis of PCAP file: ${file.name}`, '/network-scanner');
+            setIsAnalyzing(false);
+            setShowDetailedResults(true);
+            setSnackbarMessage(`PCAP file "${file.name}" analysis completed successfully.`);
+            setSnackbarOpen(true);
+            loggingService.addLog(user, 'PCAP_ANALYSIS_COMPLETE', `Completed analysis of PCAP file: ${file.name}`, '/network-scanner');
 
-      // Initialize time-series data based on analysis (optional)
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const initialProtoData = { time: timeStr };
-      generatedProtocols.forEach(p => initialProtoData[p.protocol] = p.count / 10); // Example initial value
-      setProtocolTimeData(Array(6).fill(initialProtoData)); // Fill buffer
+            // Initialize time-series data (example - adjust as needed)
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const initialProtoData = { time: timeStr };
+            transformedAnalysisDetails.protocols.forEach(p => initialProtoData[p.protocol] = p.count / 10);
+            setProtocolTimeData(Array(6).fill(initialProtoData));
 
-      const initialAppData = { time: timeStr };
-      generatedApplications.forEach(a => initialAppData[a.application] = a.connections / 10); // Example initial value
-      setApplicationTimeData(Array(6).fill(initialAppData)); // Fill buffer
+            const initialAppData = { time: timeStr };
+            transformedAnalysisDetails.applications.forEach(a => initialAppData[a.application] = a.connections / 10);
+            setApplicationTimeData(Array(6).fill(initialAppData));
+
+        } else {
+            console.error("API response data is empty.");
+            setSnackbarMessage("Analysis failed: No data received from the server.");
+            setSnackbarOpen(true);
+            setIsAnalyzing(false);
+        }
+        // --- End Process API Response ---
+
+    } catch (error: any) {
+        console.error("Error analyzing PCAP file:", error);
+        setSnackbarMessage('Error analyzing PCAP file.');
+        setSnackbarOpen(true);
+        setIsAnalyzing(false);
+    }
+};
 
 
-    }, 3000); // Simulate 3 seconds analysis time
-  };
+
 
   const handleExportResults = () => {
     // ... (Export logic remains the same)
