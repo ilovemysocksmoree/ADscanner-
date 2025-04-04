@@ -1,53 +1,37 @@
-import { User } from '../contexts/AuthContext';
-
-export interface LogEntry {
-  id: string;
-  timestamp: string;
-  userId: string;
-  userEmail: string;
-  action: string;
-  details: string;
-  ipAddress?: string;
-  path?: string;
-}
+import { User, LogEvent } from '../interfaces/common';
 
 class LoggingService {
-  private logs: LogEntry[] = [];
-
-  addLog(user: User | null, action: string, details: string, path?: string) {
-    if (!user) return;
-
-    const logEntry: LogEntry = {
-      id: Math.random().toString(36).substr(2, 9),
+  addLog(
+    user: User,
+    eventType: string,
+    message: string,
+    context: string
+  ): void {
+    const logEvent: LogEvent = {
+      userId: user?.id || 'unknown',
+      eventType,
+      message,
+      context,
       timestamp: new Date().toISOString(),
-      userId: user.id,
-      userEmail: user.email,
-      action,
-      details,
-      path,
-      ipAddress: window.location.hostname,
     };
 
-    this.logs.push(logEntry);
-    // In a real application, you would send this to your backend
-    console.log('New Log Entry:', logEntry);
+    console.log(`[Log] ${logEvent.timestamp}: ${logEvent.eventType} - ${logEvent.message}`);
     
-    // Store in localStorage for demo purposes
-    const storedLogs = localStorage.getItem('auditLogs');
-    const existingLogs = storedLogs ? JSON.parse(storedLogs) : [];
-    existingLogs.push(logEntry);
-    localStorage.setItem('auditLogs', JSON.stringify(existingLogs));
+    // Store log in localStorage for demo purposes
+    // In a real application, you would send this to a server
+    const existingLogs = localStorage.getItem('applicationLogs');
+    const logs = existingLogs ? JSON.parse(existingLogs) : [];
+    logs.push(logEvent);
+    localStorage.setItem('applicationLogs', JSON.stringify(logs));
   }
 
-  getLogs(): LogEntry[] {
-    // In a real application, you would fetch this from your backend
-    const storedLogs = localStorage.getItem('auditLogs');
-    return storedLogs ? JSON.parse(storedLogs) : [];
+  getLogs(): LogEvent[] {
+    const existingLogs = localStorage.getItem('applicationLogs');
+    return existingLogs ? JSON.parse(existingLogs) : [];
   }
 
-  clearLogs() {
-    this.logs = [];
-    localStorage.removeItem('auditLogs');
+  clearLogs(): void {
+    localStorage.removeItem('applicationLogs');
   }
 }
 

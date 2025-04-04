@@ -21,12 +21,14 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isAuthenticated: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string, isAdmin?: boolean) => Promise<void>;
   register: (userData: Partial<User> & { password: string }) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (userData: Partial<User>) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -85,6 +87,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return savedUser ? JSON.parse(savedUser) : null;
   });
   const [loading, setLoading] = useState(true);
+  
+  const isAuthenticated = !!user;
 
   useEffect(() => {
     // Initialize default users in localStorage if they don't exist
@@ -281,23 +285,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signOut = async () => {
+  const logout = async () => {
     try {
-      // Log the logout action before clearing the user
+      setUser(null);
+      localStorage.removeItem('currentUser');
+      console.log('User signed out successfully');
+
       if (user) {
         loggingService.addLog(
           user,
-          'LOGOUT',
-          'User logged out',
-          window.location.pathname
+          'USER_SIGNOUT',
+          `User ${user.email} signed out`,
+          '/signout'
         );
       }
-      
-      setUser(null);
-      localStorage.removeItem('currentUser');
     } catch (error) {
       console.error('Sign out failed:', error);
-      throw error;
     }
   };
 
@@ -430,10 +433,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     loading,
+    isAuthenticated,
     signInWithGoogle,
     signInWithEmail,
     register,
-    signOut,
+    signOut: logout,
+    logout,
     updateProfile,
     login
   };
