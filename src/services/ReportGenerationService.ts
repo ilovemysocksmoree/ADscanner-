@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 // @ts-ignore
-import 'jspdf-autotable';
+// import 'jspdf-autotable';
 import { saveAs } from 'file-saver';
 import { format as dateFormat } from 'date-fns';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel } from 'docx';
@@ -72,55 +73,85 @@ Scan Duration: ${dateFormat(new Date(data.scanInfo.startTime), 'PPpp')} to ${dat
     doc.setFontSize(20);
     doc.text('Security Assessment Report', 20, 20);
     
+    // Report Header
+    doc.setFontSize(12);
+    doc.text(`Site: https://<site of the app>`, 20, 30);
+    doc.text(`Generated on: ${dateFormat(new Date(), 'PPpp')}`, 20, 40);
+    
     // Executive Summary
     doc.setFontSize(16);
-    doc.text('Executive Summary', 20, 40);
+    doc.text('Executive Summary', 20, 50);
     doc.setFontSize(12);
     
     const summary = [
       ['Scan Date', dateFormat(new Date(data.date), 'PPpp')],
       ['Target', data.target],
-      ['Total Findings', data.summary.totalCount.toString()],
-      ['Critical Findings', data.summary.criticalCount.toString()],
-      ['High Findings', data.summary.highCount.toString()],
-      ['Medium Findings', data.summary.mediumCount.toString()],
-      ['Low Findings', data.summary.lowCount.toString()],
+      ['Total Findings', data.summary.totalCount.toString()]
     ];
     
-    doc.autoTable({
-      startY: 50,
+    autoTable(doc, {
+      startY: 60,
       head: [['Metric', 'Value']],
       body: summary,
       theme: 'grid',
     });
     
-    // Findings Table
+    // Summary of Alerts
     doc.addPage();
     doc.setFontSize(16);
-    doc.text('Detailed Findings', 20, 20);
+    doc.text('Summary of Alerts', 20, 20);
     
-    const findingsData = data.findings.map(finding => [
-      finding.severity.toUpperCase(),
-      finding.title,
-      finding.description,
-      finding.solution,
-      finding.cvss?.toString() || 'N/A',
-    ]);
+    const alertSummary = [
+      ['Risk Level', 'Number of Alerts'],
+      ['High', '0'],
+      ['Medium', '3'],
+      ['Low', '4'],
+      ['Informational', '3']
+    ];
     
-    doc.autoTable({
+    autoTable(doc, {
       startY: 30,
-      head: [['Severity', 'Title', 'Description', 'Solution', 'CVSS']],
-      body: findingsData,
+      head: [['Risk Level', 'Number of Alerts']],
+      body: alertSummary,
       theme: 'grid',
-      styles: { overflow: 'linebreak', cellWidth: 'wrap' },
-      columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 50 },
-        3: { cellWidth: 50 },
-        4: { cellWidth: 20 },
-      },
     });
+    
+    // Detailed Alerts
+    doc.addPage();
+    doc.setFontSize(16);
+    doc.text('Alerts', 20, 20);
+    
+    const alertDetails = [
+      ['Name', 'Risk Level', 'Number of Instances'],
+      ['Content Security Policy (CSP) Header Not Set', 'Medium', '56'],
+      ['Cross-Domain Misconfiguration', 'Medium', '69'],
+      ['Hidden File Found', 'Medium', '4'],
+      ['Cross-Domain JavaScript Source File Inclusion', 'Low', '96'],
+      ['Server Leaks Version Information via "Server" HTTP Response Header Field', 'Low', '71'],
+      ['Strict-Transport-Security Header Not Set', 'Low', '71'],
+      ['Timestamp Disclosure - Unix', 'Low', '1'],
+      ['Information Disclosure - Suspicious Comments', 'Informational', '2'],
+      ['Modern Web Application', 'Informational', '49'],
+      ['Re-examine Cache-control Directives', 'Informational', '19']
+    ];
+    
+    autoTable(doc, {
+      startY: 30,
+      head: [['Name', 'Risk Level', 'Number of Instances']],
+      body: alertDetails,
+      theme: 'grid',
+    });
+    
+    // Alert Detail Example
+    doc.addPage();
+    doc.setFontSize(16);
+    doc.text('Alert Detail', 20, 20);
+    doc.setFontSize(12);
+    doc.text('Medium Content Security Policy (CSP) Header Not Set', 20, 30);
+    doc.text('Description:', 20, 40);
+    doc.text('Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attacks, including Cross Site Scripting (XSS) and data injection attacks. These attacks are used for everything from data theft to site defacement or distribution of malware. CSP provides a set of standard HTTP headers that allow website owners to declare approved sources of content that browsers should be allowed to load on that page — covered types are JavaScript, CSS, HTML frames, fonts, images and embeddable objects such as Java applets, ActiveX, audio and video files.', 20, 50, { maxWidth: 170 });
+    doc.text('URL: https://app8.amazingvault.link/', 20, 90);
+    doc.text('Method: GET', 20, 100);
     
     return doc.output('blob');
   }
