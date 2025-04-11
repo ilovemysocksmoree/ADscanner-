@@ -74,6 +74,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { notificationService } from '../services/NotificationService';
+import { reportGenerationService, ReportData } from '../services/ReportGenerationService';
 
 interface ScanReport {
   id: string;
@@ -84,7 +85,9 @@ interface ScanReport {
   status: 'completed' | 'failed' | 'in_progress';
   severity: 'critical' | 'high' | 'medium' | 'low';
   details: {
-    vulnerabilities: number;
+    vulnerabilities: {
+      [key: string]: number;
+    };
     networkIssues: number;
     performanceMetrics: {
       responseTime: number;
@@ -226,7 +229,11 @@ const mockReports: ScanReport[] = [
     status: 'completed',
     severity: 'critical',
     details: {
-      vulnerabilities: 3,
+      vulnerabilities: {
+        'High Risk': 3,
+        'Medium Risk': 6,
+        'Low Risk': 3,
+      },
       networkIssues: 0,
       performanceMetrics: {
         responseTime: 100,
@@ -245,7 +252,10 @@ const mockReports: ScanReport[] = [
     status: 'completed',
     severity: 'high',
     details: {
-      vulnerabilities: 0,
+      vulnerabilities: {
+        'High Risk': 2,
+        'Medium Risk': 3,
+      },
       networkIssues: 5,
       performanceMetrics: {
         responseTime: 150,
@@ -264,7 +274,10 @@ const mockReports: ScanReport[] = [
     status: 'failed',
     severity: 'low',
     details: {
-      vulnerabilities: 0,
+      vulnerabilities: {
+        'High Risk': 0,
+        'Medium Risk': 2,
+      },
       networkIssues: 0,
       performanceMetrics: {
         responseTime: 0,
@@ -594,242 +607,90 @@ export default function Reports() {
     setSelectedReport(report);
     setOpenDialog(true);
     
+    if (user) {
     loggingService.addLog(
       user,
       'OPEN_REPORT_EXPORT',
       `Opened export dialog for report: ${report.id}`,
       '/reports'
     );
+    }
   };
 
   const handleFormatChange = (event: SelectChangeEvent) => {
     setExportFormat(event.target.value);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!selectedReport) return;
 
-    const generateExecutiveSummary = (report: ScanReport) => {
-      return {
-        overview: `Security assessment conducted on ${report.date} revealed ${report.findings} findings of varying severity levels.`,
-        riskLevel: report.severity,
-        keyFindings: [
-          `${report.details.vulnerabilities} vulnerabilities identified`,
-          `Network security score: ${report.details.securityScore}/100`,
-          `System performance impact: ${report.details.performanceMetrics.responseTime}ms average response time`
-        ],
-        recommendations: [
-          "Implement immediate patching for critical vulnerabilities",
-          "Enhance network segmentation",
-          "Update security policies and procedures"
-        ]
-      };
-    };
-
-    const generateDetailedAnalysis = (report: ScanReport) => {
-      return {
-        vulnerabilityBreakdown: {
-          critical: report.severity === 'critical' ? report.findings : 0,
-          high: report.severity === 'high' ? report.findings : 0,
-          medium: report.severity === 'medium' ? report.findings : 0,
-          low: report.severity === 'low' ? report.findings : 0
+    // Convert the selected report to the ReportData format
+    const reportData: ReportData = {
+      id: selectedReport.id,
+      date: selectedReport.date,
+      type: selectedReport.type,
+      target: selectedReport.target,
+      findings: [
+        {
+          id: '1',
+          severity: selectedReport.severity,
+          title: `${selectedReport.type} Assessment Finding`,
+          description: `Found ${selectedReport.findings} issues during the ${selectedReport.type} scan.`,
+          solution: 'Review and address identified issues according to severity.',
+          cvss: selectedReport.details.securityScore,
         },
-        networkAnalysis: {
-          topology: "Detailed network map analysis",
-          exposedServices: ["HTTP", "HTTPS", "SSH", "FTP"],
-          securityMeasures: {
-            firewallStatus: "Active",
-            encryptionProtocols: ["TLS 1.3", "TLS 1.2"],
-            certificateStatus: "Valid"
-          }
-        },
-        systemHealth: {
-          cpuUtilization: "45%",
-          memoryUsage: "60%",
-          diskSpace: "75% available",
-          responseTime: report.details.performanceMetrics.responseTime + "ms",
-          uptime: report.details.performanceMetrics.uptime + "%"
-        }
-      };
-    };
-
-    const generateRemediationPlan = (report: ScanReport) => {
-      return {
-        immediate: [
-          {
-            issue: "Critical vulnerabilities",
-            action: "Apply security patches",
-            timeline: "24 hours",
-            resources: "System administration team"
-          }
-        ],
-        shortTerm: [
-          {
-            issue: "Network security gaps",
-            action: "Implement network segmentation",
-            timeline: "1 week",
-            resources: "Network security team"
-          }
-        ],
-        longTerm: [
-          {
-            issue: "System architecture improvements",
-            action: "Migrate to zero-trust architecture",
-            timeline: "3 months",
-            resources: "Security and DevOps teams"
-          }
-        ]
-      };
-    };
-
-    const generateComplianceAssessment = () => {
-      return {
-        standards: [
-          {
-            name: "ISO 27001",
-            compliance: "85%",
-            gaps: ["Access Control", "Cryptography"],
-            recommendations: ["Implement MFA", "Upgrade encryption protocols"]
-          },
-          {
-            name: "NIST CSF",
-            compliance: "78%",
-            gaps: ["Incident Response", "Recovery Planning"],
-            recommendations: ["Update IR playbooks", "Conduct recovery drills"]
-          },
-          {
-            name: "GDPR",
-            compliance: "92%",
-            gaps: ["Data Processing Records"],
-            recommendations: ["Update processing documentation"]
-          }
-        ]
-      };
-    };
-
-    const exportData = {
-      ...mockComprehensiveReport,
-      generatedReport: {
-        id: selectedReport.id,
-        timestamp: new Date().toISOString(),
-        type: exportFormat,
-        metadata: {
-          generatedBy: user?.email || 'System',
-          scanTarget: selectedReport.target,
-          scanDuration: "2 hours 15 minutes",
-          toolVersion: "3.5.0"
-        },
-        executiveSummary: generateExecutiveSummary(selectedReport),
-        detailedAnalysis: generateDetailedAnalysis(selectedReport),
-        remediationPlan: generateRemediationPlan(selectedReport),
-        complianceAssessment: generateComplianceAssessment(),
-        appendices: {
-          rawData: selectedReport,
-          scanConfigurations: {
+        // Add more findings based on the details
+        ...Object.entries(selectedReport.details.vulnerabilities || {}).map(([type, count], index) => ({
+          id: `${index + 2}`,
+          severity: (type.toLowerCase().includes('critical') ? 'critical' as const :
+                    type.toLowerCase().includes('high') ? 'high' as const : 
+                    type.toLowerCase().includes('medium') ? 'medium' as const : 'low' as const),
+          title: `${type} Finding`,
+          description: `Detected ${count} ${type.toLowerCase()} issues.`,
+          solution: `Address ${type.toLowerCase()} vulnerabilities according to security policy.`,
+          cvss: selectedReport.details.securityScore * (
+            type.toLowerCase().includes('critical') ? 0.9 :
+            type.toLowerCase().includes('high') ? 0.8 : 
+            type.toLowerCase().includes('medium') ? 0.5 : 0.3
+          ),
+        })),
+      ],
+      summary: {
+        criticalCount: selectedReport.severity === 'critical' ? selectedReport.findings : 0,
+        highCount: selectedReport.severity === 'high' ? selectedReport.findings : 0,
+        mediumCount: selectedReport.severity === 'medium' ? selectedReport.findings : 0,
+        lowCount: selectedReport.severity === 'low' ? selectedReport.findings : 0,
+        totalCount: selectedReport.findings,
+      },
+      scanInfo: {
+        startTime: selectedReport.date,
+        endTime: new Date(new Date(selectedReport.date).getTime() + 2 * 60 * 60 * 1000).toISOString(),
+        scannerVersion: '3.5.0',
+        targetHost: selectedReport.target,
             scanType: selectedReport.type,
-            targetScope: selectedReport.target,
-            excludedHosts: [],
-            scanPolicy: "Standard security assessment"
-          },
-          toolConfiguration: {
-            version: "3.5.0",
-            modules: ["Vulnerability Scanner", "Network Analyzer", "Compliance Checker"],
-            signatures: "Latest (2024-03-20)",
-            customRules: []
-          }
-        }
-      }
+      },
     };
 
-    // Convert the report to the selected format
-    let content: string | Blob;
-    let mimeType: string;
-    let fileExtension: string;
-
-    const formatReport = (data: any) => {
-      switch (exportFormat) {
-        case 'pdf':
-          // In a real implementation, you would use a PDF generation library
-          return JSON.stringify(data, null, 2);
-        case 'doc':
-          // Structure content for Word document
-          return JSON.stringify(data, null, 2);
-        case 'json':
-          return JSON.stringify(data, null, 2);
-        case 'csv':
-          // Convert the data to CSV format with detailed sections
-          const csvRows = [
-            'Section,Category,Finding,Severity,Details'
-          ];
-          
-          // Add vulnerability breakdown
-          Object.entries(data.generatedReport.detailedAnalysis.vulnerabilityBreakdown)
-            .forEach(([severity, count]) => {
-              csvRows.push(`Vulnerabilities,${severity},Count,${count},Impact: ${severity === 'critical' ? 'Immediate action required' : 'Action required'}`);
-            });
-          
-          // Add remediation plans
-          data.generatedReport.remediationPlan.immediate
-            .forEach(item => {
-              csvRows.push(`Remediation,Immediate,${item.issue},Critical,${item.action}, Timeline: ${item.timeline}`);
-            });
-          
-          return csvRows.join('\n');
-        default:
-          return JSON.stringify(data, null, 2);
-      }
-    };
-
-    switch (exportFormat) {
-      case 'pdf':
-        content = formatReport(exportData);
-        mimeType = 'application/pdf';
-        fileExtension = 'pdf';
-        break;
-      case 'doc':
-        content = formatReport(exportData);
-        mimeType = 'application/msword';
-        fileExtension = 'doc';
-        break;
-      case 'json':
-        content = formatReport(exportData);
-        mimeType = 'application/json';
-        fileExtension = 'json';
-        break;
-      case 'csv':
-        content = formatReport(exportData);
-        mimeType = 'text/csv';
-        fileExtension = 'csv';
-        break;
-      default:
-        content = formatReport(exportData);
-        mimeType = 'application/json';
-        fileExtension = 'json';
-    }
-
-    // Create and trigger download
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `security-report-${selectedReport.target}-${new Date().toISOString()}.${fileExtension}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
+    try {
+      await reportGenerationService.exportReport(reportData, exportFormat as 'pdf' | 'doc' | 'csv' | 'json');
     setOpenDialog(false);
     
+      if (user) {
     loggingService.addLog(
       user,
       'EXPORT_REPORT',
       `Exported comprehensive report ${selectedReport.id} as ${exportFormat}`,
       '/reports'
     );
+      }
 
-    // Show success message
     setSnackbarMessage('Report exported successfully');
     setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Error exporting report:', error);
+      setSnackbarMessage('Failed to export report. Please try again.');
+      setSnackbarOpen(true);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -844,21 +705,25 @@ export default function Reports() {
   };
 
   const handleGenerateReport = () => {
+    if (user) {
     loggingService.addLog(
       user,
       'GENERATE_REPORT',
       `Generated ${reportType} report for last ${dateRange} days`,
       '/reports'
     );
+    }
   };
 
   const handleDownload = (reportId: string) => {
+    if (user) {
     loggingService.addLog(
       user,
       'DOWNLOAD_REPORT',
       `Downloaded report: ${reportId}`,
       '/reports'
     );
+    }
   };
 
   const handlePrintReport = (reportId: string) => {
@@ -866,24 +731,28 @@ export default function Reports() {
     setSnackbarMessage('Preparing report for printing...');
     setSnackbarOpen(true);
     
+    if (user) {
     loggingService.addLog(
       user,
       'PRINT_REPORT',
       `Printing report: ${reportId}`,
       '/reports'
     );
+    }
   };
 
   const handleShareDialog = (reportId: string) => {
     setSnackbarMessage('Sharing options will be available soon');
     setSnackbarOpen(true);
     
+    if (user) {
     loggingService.addLog(
       user,
       'SHARE_REPORT_DIALOG',
       `Opened share dialog for report: ${reportId}`,
       '/reports'
     );
+    }
   };
 
   const handleShare = (reportId: string) => {
