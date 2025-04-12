@@ -9,11 +9,11 @@ import {
   CircularProgress
 } from '@mui/material';
 
-interface ADConnectionFormProps {
+interface ConnectionFormProps {
   onConnect?: () => void;
 }
 
-const ADConnectionForm: React.FC<ADConnectionFormProps> = ({ onConnect }) => {
+const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
   const [domain, setDomain] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -141,4 +141,4 @@ const ADConnectionForm: React.FC<ADConnectionFormProps> = ({ onConnect }) => {
   );
 };
 
-export default ADConnectionForm; 
+export default ConnectionForm; 

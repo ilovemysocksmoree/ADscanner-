@@ -28,8 +28,21 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { loggingService, LogEntry } from '../../services/LoggingService';
-import ADConnectionForm from '../../components/ADConnectionForm';
+import { loggingService } from '../../services/LoggingService';
+import ConnectionForm from '../../components/active-directory/ConnectionForm';
+import { LogEvent } from '../../interfaces/common';
+
+// Define the LogEntry interface locally if it's not exported
+interface LogEntry {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userEmail: string;
+  action: string;
+  details: string;
+  ipAddress: string;
+  path: string;
+}
 
 const actionTypes = [
   // Authentication
@@ -100,8 +113,14 @@ const actionCategories = {
 export default function AdminLogs() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    action: '',
+    user: '',
+  });
+  const [logs, setLogs] = useState<LogEvent[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedAction, setSelectedAction] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [dateRange, setDateRange] = useState<{
@@ -130,36 +149,29 @@ export default function AdminLogs() {
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = 
-      log.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchTerm.toLowerCase());
+      log.userId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.eventType.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.message.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesAction = !selectedAction || log.action === selectedAction;
+    const matchesAction = !selectedAction || log.eventType === selectedAction;
     
-    const matchesCategory = !selectedCategory || 
-      Object.entries(actionCategories).find(([category, actions]) => 
-        category === selectedCategory && actions.includes(log.action)
-      );
-
-    const logDate = new Date(log.timestamp);
-    const matchesDateRange = (
-      (!dateRange.start || logDate >= new Date(dateRange.start)) &&
-      (!dateRange.end || logDate <= new Date(dateRange.end))
-    );
-
-    return matchesSearch && matchesAction && matchesCategory && matchesDateRange;
+    if (selectedCategory) {
+      const category = actionTypes.find(action => action === log.eventType)?.split('_')[0];
+      return matchesSearch && matchesAction && category === selectedCategory;
+    }
+    
+    return matchesSearch && matchesAction;
   });
 
-  const handleExport = () => {
+  const handleExportLogs = () => {
     const csvData = [
-      ['Timestamp', 'User Email', 'Action', 'Details', 'IP Address', 'Path'],
+      ['Timestamp', 'User ID', 'Event Type', 'Message', 'Context'],
       ...filteredLogs.map(log => [
         new Date(log.timestamp).toLocaleString(),
-        log.userEmail,
-        log.action,
-        log.details,
-        log.ipAddress || '',
-        log.path || ''
+        log.userId,
+        log.eventType,
+        log.message,
+        log.context || ''
       ])
     ];
 
@@ -173,35 +185,61 @@ export default function AdminLogs() {
     link.download = `activity_logs_${new Date().toISOString()}.csv`;
     link.click();
 
-    loggingService.addLog(
-      user,
-      'EXPORT_LOGS',
-      `Exported ${filteredLogs.length} log entries`,
-      '/admin/logs'
-    );
+    if (user) {
+      loggingService.addLog(
+        user,
+        'EXPORT_LOGS',
+        `Exported ${filteredLogs.length} log entries`,
+        '/admin/logs'
+      );
+    }
   };
 
   const handleClearLogs = () => {
     if (window.confirm('Are you sure you want to clear all logs? This action cannot be undone.')) {
       loggingService.clearLogs();
       setLogs([]);
-      loggingService.addLog(
-        user,
-        'CLEAR_LOGS',
-        'Cleared all activity logs',
-        '/admin/logs'
-      );
+      
+      if (user) {
+        loggingService.addLog(
+          user,
+          'CLEAR_LOGS',
+          'Cleared all activity logs',
+          '/admin/logs'
+        );
+      }
     }
   };
 
-  const getActionColor = (action: string): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" => {
-    if (action.includes('ERROR') || action.includes('DELETE')) return 'error';
-    if (action.includes('CREATE') || action.includes('ADD')) return 'success';
-    if (action.includes('UPDATE') || action.includes('EDIT')) return 'warning';
-    if (action.includes('SCAN')) return 'info';
-    if (action.includes('LOGIN') || action.includes('REGISTER')) return 'primary';
-    if (action.includes('ALERT')) return 'secondary';
-    return 'default';
+  const getActionColor = (eventType: string) => {
+    // Map action prefixes to colors
+    const actionColors: Record<string, 'success' | 'error' | 'info' | 'warning' | 'default'> = {
+      LOGIN: 'success',
+      LOGOUT: 'info',
+      REGISTER: 'success',
+      PASSWORD: 'warning',
+      ACCOUNT: 'info',
+      CREATE: 'success',
+      UPDATE: 'info',
+      DELETE: 'error',
+      EXPORT: 'info',
+      GENERATE: 'info',
+      START: 'success',
+      STOP: 'warning',
+      ERROR: 'error',
+      VULNERABILITY: 'warning',
+      NETWORK: 'info',
+      DOMAIN: 'info',
+      ROLE: 'info',
+      CLEAR: 'error',
+    };
+
+    // Find matching prefix
+    const prefix = Object.keys(actionColors).find(prefix => 
+      eventType.startsWith(prefix)
+    );
+
+    return prefix ? actionColors[prefix] : 'default';
   };
 
   return (
@@ -214,7 +252,7 @@ export default function AdminLogs() {
           <Button
             variant="outlined"
             startIcon={<DownloadIcon />}
-            onClick={handleExport}
+            onClick={handleExportLogs}
             sx={{ mr: 2 }}
           >
             Export Logs
@@ -233,8 +271,8 @@ export default function AdminLogs() {
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
         <TextField
           placeholder="Search logs..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           sx={{ flexGrow: 1 }}
           InputProps={{
             startAdornment: (
@@ -305,36 +343,34 @@ export default function AdminLogs() {
           <TableHead>
             <TableRow>
               <TableCell>Timestamp</TableCell>
-              <TableCell>User</TableCell>
-              <TableCell>Action</TableCell>
-              <TableCell>Details</TableCell>
-              <TableCell>IP Address</TableCell>
-              <TableCell>Path</TableCell>
+              <TableCell>User ID</TableCell>
+              <TableCell>Event Type</TableCell>
+              <TableCell>Message</TableCell>
+              <TableCell>Context</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredLogs.map((log) => (
-              <TableRow key={log.id}>
+              <TableRow key={log.timestamp + log.userId + log.eventType}>
                 <TableCell>
                   {new Date(log.timestamp).toLocaleString()}
                 </TableCell>
-                <TableCell>{log.userEmail}</TableCell>
+                <TableCell>{log.userId}</TableCell>
                 <TableCell>
                   <Chip
-                    label={log.action.replace(/_/g, ' ')}
-                    color={getActionColor(log.action)}
+                    label={log.eventType.replace(/_/g, ' ')}
+                    color={getActionColor(log.eventType)}
                     size="small"
                     sx={{ minWidth: 120 }}
                   />
                 </TableCell>
-                <TableCell>{log.details}</TableCell>
-                <TableCell>{log.ipAddress}</TableCell>
-                <TableCell>{log.path}</TableCell>
+                <TableCell>{log.message}</TableCell>
+                <TableCell>{log.context}</TableCell>
               </TableRow>
             ))}
             {filteredLogs.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={5} align="center">
                   No logs found
                 </TableCell>
               </TableRow>
@@ -344,8 +380,8 @@ export default function AdminLogs() {
       </TableContainer>
 
       <Box sx={{ mt: 4 }}>
-        <Typography variant="h6">AD Scanner</Typography>
-        <ADConnectionForm />
+        <Typography variant="h6">Active Directory Connection</Typography>
+        <ConnectionForm />
       </Box>
     </Box>
   );
