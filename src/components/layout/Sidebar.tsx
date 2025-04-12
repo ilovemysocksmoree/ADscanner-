@@ -97,6 +97,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       {isAdmin && (
         <>
           <Divider />
+          <Typography
+            variant="subtitle1"
+            sx={{ 
+              px: 2,
+              py: 1,
+              fontWeight: 700,
+              color: 'primary.main'
+            }}
+          >
+            Admin Panel
+          </Typography>
           <List>
             {adminNavigationItems.map((item) => (
               <ListItem key={item.path} disablePadding>
