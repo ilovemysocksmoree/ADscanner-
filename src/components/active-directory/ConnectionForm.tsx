@@ -36,7 +36,7 @@ import { activeDirectoryService } from '../../services/ActiveDirectoryService';
 import { loggingService } from '../../services/LoggingService';
 
 interface ConnectionFormProps {
-  onConnect?: (serverIP: string) => void;
+  onConnect?: (serverIP: string, domain: string) => void;
 }
 
 interface CheckStep {
@@ -147,9 +147,9 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
         setError(`Connection test failed. Server reported: ${data.message || 'Unknown error'}`);
         loggingService.logError(`Server reported unhealthy status: ${JSON.stringify(data)}`);
       }
-    } catch (err) {
-      console.error('Full error:', err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
+    } catch (error: any) {
+      console.error('Full error:', error);
+      const errorMessage = error?.message || String(error);
       loggingService.logError(`Failed to connect to AD server: ${errorMessage}`);
       
       // Update the appropriate step to error state
@@ -188,6 +188,31 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
     setSuccess(null);
 
     try {
+      // Test direct API access first
+      try {
+        const testUrl = 'http://192.168.1.5:4444/api/v1/ad/object/users';
+        const testBody = {
+          address: `ldap://${serverIP}:389`,
+          domain_name: domain
+        };
+        
+        console.log('Testing direct API access to:', testUrl);
+        const testResponse = await fetch(testUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(testBody)
+        });
+        
+        const testData = await testResponse.json();
+        console.log('Direct API test response:', testData);
+        
+        if (testData && testData.users) {
+          console.log(`Direct API test success! Found ${testData.users.length} users.`);
+        }
+      } catch (apiTestError) {
+        console.error('Direct API test failed:', apiTestError);
+      }
+
       // Use the service to connect
       const data = await activeDirectoryService.connect(serverIP, domain, username, password);
       
@@ -196,18 +221,15 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
         loggingService.logInfo(`Connected to AD server: ${serverIP} with domain: ${domain}`);
         
         if (onConnect) {
-          onConnect(serverIP);
+          onConnect(serverIP, domain);
         }
       } else {
         setError(`Connection failed: ${data.message || 'Unknown error'}`);
       }
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(`Failed to connect to Active Directory: ${err.message}`);
-      } else {
-        setError(`Failed to connect to Active Directory: ${String(err)}`);
-      }
-      console.error('Connection error:', err);
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error);
+      setError(`Failed to connect to Active Directory: ${errorMessage}`);
+      console.error('Connection error:', error);
     } finally {
       setLoading(false);
     }

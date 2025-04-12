@@ -358,7 +358,7 @@ export default function AdminLogs() {
 
       <Box sx={{ mt: 4 }}>
         <Typography variant="h6">AD Scanner</Typography>
-        <ConnectionForm onConnect={(ip) => console.log(`Connected to: ${ip}`)} />
+        <ConnectionForm onConnect={(ip, domain) => console.log(`Connected to: ${ip}, Domain: ${domain}`)} />
       </Box>
     </Box>
   );

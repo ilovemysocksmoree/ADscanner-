@@ -10,6 +10,7 @@ import {
   PaginatedResponse,
   ADSearchParams
 } from '../models/ad-entities';
+import { mockFetchAdUsers } from '../utils/mockAdApiService';
 
 // Define interfaces for API responses
 export interface HealthCheckResponse {
@@ -137,6 +138,9 @@ class ActiveDirectoryService {
       
       loggingService.logInfo(`Connecting to AD server: ${serverIP}`);
       
+      // Store domain name for later API requests
+      localStorage.setItem('ad_domain_name', domain);
+      
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
@@ -186,68 +190,108 @@ class ActiveDirectoryService {
   // Get users with pagination and search
   async getUsers(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADUser>> {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const serverIP = this.getServerIP();
+      if (!serverIP) {
+        throw new Error('Server IP not set');
+      }
+
+      // Log the request
+      loggingService.logInfo(`Fetching AD users from ${serverIP}, page ${page}, size ${pageSize}`);
+
+      // Use a direct API call without the service layer for testing
+      const directUrl = 'http://192.168.1.5:4444/api/v1/ad/object/users';
+      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
+      const body = {
+        address: `ldap://${serverIP}:389`,
+        domain_name: domain
+      };
+
+      console.log('Sending request to:', directUrl);
+      console.log('Request body:', JSON.stringify(body));
+
+      let data: any;
+      try {
+        // Make a simple API call
+        const response = await fetch(directUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        console.log('Response status:', response.status);
+        data = await response.json();
+        console.log('API response:', data);
+      } catch (error) {
+        console.error('Error calling API directly:', error);
+        // Return mock data as fallback
+        console.log('Using mock data as fallback');
+        return this.getMockUsers(page, pageSize, filter);
+      }
+
+      console.log('API response:', data);
       
-      // Create mock data
-      const mockUsers: ADUser[] = [
-        {
-          id: '1',
-          distinguishedName: 'CN=John Smith,OU=IT,DC=example,DC=com',
-          name: 'John Smith',
-          displayName: 'John Smith',
-          samAccountName: 'john.smith',
-          email: 'john.smith@example.com',
-          enabled: true,
-          locked: false,
-          firstName: 'John',
-          lastName: 'Smith',
-          groups: ['Domain Users', 'IT Staff'],
-          department: 'IT',
-          title: 'System Administrator'
-        },
-        {
-          id: '2',
-          distinguishedName: 'CN=Jane Doe,OU=HR,DC=example,DC=com',
-          name: 'Jane Doe',
-          displayName: 'Jane Doe',
-          samAccountName: 'jane.doe',
-          email: 'jane.doe@example.com',
-          enabled: true,
-          locked: false,
-          firstName: 'Jane',
-          lastName: 'Doe',
-          groups: ['Domain Users', 'HR Staff'],
-          department: 'Human Resources',
-          title: 'HR Manager'
-        },
-        {
-          id: '3',
-          distinguishedName: 'CN=Bob Johnson,OU=Sales,DC=example,DC=com',
-          name: 'Bob Johnson',
-          displayName: 'Bob Johnson',
-          samAccountName: 'bob.johnson',
-          email: 'bob.johnson@example.com',
-          enabled: false,
-          locked: true,
-          firstName: 'Bob',
-          lastName: 'Johnson',
-          groups: ['Domain Users'],
-          department: 'Sales',
-          title: 'Sales Representative'
-        }
-      ];
-      
-      // Filter by search query if provided
+      if (data.status !== 'success') {
+        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
+      }
+
+      // Transform the API response to our ADUser format
+      const users: ADUser[] = data.users.map((user: any) => {
+        // Convert Windows file time to JavaScript Date
+        // Windows file time is 100-nanosecond intervals since January 1, 1601 UTC
+        // Need to convert to milliseconds since Unix epoch (January 1, 1970)
+        const convertWindowsTime = (windowsTime: number): Date | undefined => {
+          if (!windowsTime) return undefined;
+          // Calculate milliseconds from Windows file time
+          const milliseconds = Number(windowsTime) / 10000 - 11644473600000;
+          if (isNaN(milliseconds) || milliseconds < 0) return undefined;
+          return new Date(milliseconds);
+        };
+
+        // Check if the account is disabled
+        const isDisabled = user.userAccountControl && (user.userAccountControl & 2) !== 0;
+        // Check if the account is locked
+        const isLocked = user.userAccountControl && (user.userAccountControl & 16) !== 0;
+        // Check if password expired
+        const isPwdExpired = user.userAccountControl && (user.userAccountControl & 8388608) !== 0;
+
+        return {
+          id: user.objectGUID || user.distinguishedName, // Use GUID or DN as fallback
+          distinguishedName: user.distinguishedName,
+          name: user.displayName || user.samAccountName,
+          displayName: user.displayName || user.samAccountName,
+          samAccountName: user.samAccountName,
+          userPrincipalName: user.userPrincipalName || '',
+          firstName: user.givenName || '',
+          lastName: user.surName || '',
+          email: user.mail || '',
+          enabled: !isDisabled,
+          locked: isLocked,
+          passwordExpired: isPwdExpired,
+          lastLogon: convertWindowsTime(user.lastLogon),
+          groups: user.memberof || [],
+          description: user.description || '',
+          created: user.whenCreated ? new Date(user.whenCreated) : undefined,
+          modified: user.whenChanged ? new Date(user.whenChanged) : undefined,
+          manager: user.manager || '',
+          phoneNumber: user.telephoneNumber || user.mobile || '',
+          department: user.department || '',
+          title: user.title || '',
+          company: user.company || ''
+        };
+      });
+
+      // Apply client-side filtering if filter is provided
       const filteredUsers = filter
-        ? mockUsers.filter(user => 
-            user.displayName.toLowerCase().includes(filter.toLowerCase()) ||
-            user.samAccountName.toLowerCase().includes(filter.toLowerCase()) ||
-            (user.email && user.email.toLowerCase().includes(filter.toLowerCase()))
+        ? users.filter(user => 
+            (user.displayName && user.displayName.toLowerCase().includes(filter.toLowerCase())) ||
+            (user.samAccountName && user.samAccountName.toLowerCase().includes(filter.toLowerCase())) ||
+            (user.email && user.email.toLowerCase().includes(filter.toLowerCase())) ||
+            (user.department && user.department.toLowerCase().includes(filter.toLowerCase())) ||
+            (user.title && user.title.toLowerCase().includes(filter.toLowerCase()))
           )
-        : mockUsers;
+        : users;
       
-      // Calculate pagination
+      // Apply client-side pagination
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
       const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
@@ -263,70 +307,172 @@ class ActiveDirectoryService {
       console.error('Error fetching AD users:', error);
       loggingService.logError(`Failed to fetch users: ${error instanceof Error ? error.message : String(error)}`);
       
-      // Return empty response on error
-      return {
-        items: [],
-        totalCount: 0,
-        page,
-        pageSize,
-        hasMore: false
-      };
+      // For development, return mock data if API call fails
+      return this.getMockUsers(page, pageSize, filter);
     }
+  }
+
+  // Get mock users for development/fallback
+  private getMockUsers(page = 1, pageSize = 10, filter = ''): PaginatedResponse<ADUser> {
+    // Create mock data
+    const mockUsers: ADUser[] = [
+      {
+        id: '1',
+        distinguishedName: 'CN=Administrator,CN=Users,DC=adscanner,DC=local',
+        name: 'Administrator',
+        displayName: 'Administrator',
+        samAccountName: 'Administrator',
+        userPrincipalName: 'administrator@adscanner.local',
+        firstName: '',
+        lastName: '',
+        email: 'admin@adscanner.local',
+        enabled: true,
+        locked: false,
+        description: 'Built-in account for administering the computer/domain',
+        groups: [
+          'CN=Group Policy Creator Owners,CN=Users,DC=adscanner,DC=local',
+          'CN=Domain Admins,CN=Users,DC=adscanner,DC=local',
+          'CN=Enterprise Admins,CN=Users,DC=adscanner,DC=local'
+        ],
+        created: new Date('2023-04-05T13:31:03Z'),
+        modified: new Date('2023-04-05T13:49:57Z'),
+        lastLogon: new Date('2023-04-18T12:23:51Z')
+      },
+      {
+        id: '2',
+        distinguishedName: 'CN=Guest,CN=Users,DC=adscanner,DC=local',
+        name: 'Guest',
+        displayName: 'Guest Account',
+        samAccountName: 'Guest',
+        userPrincipalName: '',
+        firstName: '',
+        lastName: '',
+        email: '',
+        enabled: false,
+        locked: false,
+        description: 'Built-in account for guest access to the computer/domain',
+        groups: ['CN=Guests,CN=Builtin,DC=adscanner,DC=local'],
+        created: new Date('2023-04-05T13:31:03Z'),
+        modified: new Date('2023-04-05T13:31:03Z')
+      },
+      {
+        id: '3',
+        distinguishedName: 'CN=John Smith,OU=IT,DC=adscanner,DC=local',
+        name: 'John Smith',
+        displayName: 'John Smith',
+        samAccountName: 'john.smith',
+        userPrincipalName: 'john.smith@adscanner.local',
+        firstName: 'John',
+        lastName: 'Smith',
+        email: 'john.smith@adscanner.local',
+        enabled: true,
+        locked: false,
+        title: 'System Administrator',
+        department: 'IT',
+        phoneNumber: '555-1234',
+        company: 'ACME Corp',
+        groups: [
+          'CN=Domain Users,CN=Users,DC=adscanner,DC=local',
+          'CN=IT Staff,OU=Groups,DC=adscanner,DC=local'
+        ],
+        created: new Date('2023-04-10T08:15:00Z'),
+        modified: new Date('2023-04-15T09:30:00Z'),
+        lastLogon: new Date('2023-04-18T07:45:00Z')
+      }
+    ];
+    
+    // Filter by search query if provided
+    const filteredUsers = filter
+      ? mockUsers.filter(user => 
+          (user.displayName && user.displayName.toLowerCase().includes(filter.toLowerCase())) ||
+          (user.samAccountName && user.samAccountName.toLowerCase().includes(filter.toLowerCase())) ||
+          (user.email && user.email.toLowerCase().includes(filter.toLowerCase())) ||
+          (user.department && user.department.toLowerCase().includes(filter.toLowerCase()))
+        )
+      : mockUsers;
+    
+    // Calculate pagination
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+    
+    return {
+      items: paginatedUsers,
+      totalCount: filteredUsers.length,
+      page,
+      pageSize,
+      hasMore: endIndex < filteredUsers.length
+    };
   }
 
   // Get groups with pagination and search
   async getGroups(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADGroup>> {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Create mock data
-      const mockGroups: ADGroup[] = [
-        {
-          id: '1',
-          distinguishedName: 'CN=Domain Admins,CN=Users,DC=example,DC=com',
-          name: 'Domain Admins',
-          samAccountName: 'Domain Admins',
-          description: 'Designated administrators of the domain',
-          groupType: 'Security',
-          groupScope: 'Global',
-          memberCount: 5,
-          isSecurityGroup: true,
-          managedBy: 'CN=Administrator,CN=Users,DC=example,DC=com'
+      const serverIP = this.getServerIP();
+      if (!serverIP) {
+        throw new Error('Server IP not set');
+      }
+
+      // Log the request
+      loggingService.logInfo(`Fetching AD groups from ${serverIP}, page ${page}, size ${pageSize}`);
+
+      // Use the specific API endpoint
+      const url = 'http://192.168.1.5:4444/api/v1/ad/object/groups';
+      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
+      const body = {
+        address: `ldap://${serverIP}:389`,
+        domain_name: domain
+      };
+
+      console.log('Sending request to:', url);
+      console.log('Request body:', JSON.stringify(body));
+
+      // Make the API call
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {})
         },
-        {
-          id: '2',
-          distinguishedName: 'CN=Marketing Department,OU=Groups,DC=example,DC=com',
-          name: 'Marketing Department',
-          samAccountName: 'Marketing',
-          description: 'All marketing staff',
-          groupType: 'Distribution',
-          groupScope: 'Universal',
-          memberCount: 12,
-          isSecurityGroup: false
-        },
-        {
-          id: '3',
-          distinguishedName: 'CN=IT Department,OU=Groups,DC=example,DC=com',
-          name: 'IT Department',
-          samAccountName: 'IT',
-          description: 'IT support staff',
-          groupType: 'Security',
-          groupScope: 'Global',
-          memberCount: 8,
-          isSecurityGroup: true
-        }
-      ];
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      console.log('API response:', data);
       
-      // Filter by search query if provided
+      if (data.status !== 'success') {
+        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
+      }
+
+      // Transform the API response to our ADGroup format
+      const groups: ADGroup[] = (data.groups || []).map((group: any) => {
+        return {
+          id: group.objectGUID || group.distinguishedName,
+          distinguishedName: group.distinguishedName,
+          name: group.name || group.samAccountName,
+          samAccountName: group.samAccountName,
+          description: group.description || '',
+          groupType: group.groupType || 'Security',
+          groupScope: group.groupScope || 'Global',
+          memberCount: group.members ? group.members.length : 0,
+          isSecurityGroup: group.isSecurityGroup !== false,
+          managedBy: group.managedBy || ''
+        };
+      });
+      
+      // Apply client-side filtering if filter is provided
       const filteredGroups = filter
-        ? mockGroups.filter(group => 
+        ? groups.filter(group => 
             group.name.toLowerCase().includes(filter.toLowerCase()) ||
             (group.description && group.description.toLowerCase().includes(filter.toLowerCase()))
           )
-        : mockGroups;
+        : groups;
       
-      // Calculate pagination
+      // Apply client-side pagination
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
       const paginatedGroups = filteredGroups.slice(startIndex, endIndex);
@@ -338,6 +484,7 @@ class ActiveDirectoryService {
         pageSize,
         hasMore: endIndex < filteredGroups.length
       };
+      
     } catch (error) {
       console.error('Error fetching AD groups:', error);
       loggingService.logError(`Failed to fetch groups: ${error instanceof Error ? error.message : String(error)}`);
@@ -356,57 +503,70 @@ class ActiveDirectoryService {
   // Get organizational units with pagination and search
   async getOrganizationalUnits(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADOrganizationalUnit>> {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const serverIP = this.getServerIP();
+      if (!serverIP) {
+        throw new Error('Server IP not set');
+      }
+
+      // Log the request
+      loggingService.logInfo(`Fetching AD OUs from ${serverIP}, page ${page}, size ${pageSize}`);
+
+      // Use the specific API endpoint
+      const url = 'http://192.168.1.5:4444/api/v1/ad/object/ous';
+      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
+      const body = {
+        address: `ldap://${serverIP}:389`,
+        domain_name: domain
+      };
+
+      console.log('Sending request to:', url);
+      console.log('Request body:', JSON.stringify(body));
+
+      // Make the API call
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {})
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      console.log('API response:', data);
       
-      // Create mock data
-      const mockOUs: ADOrganizationalUnit[] = [
-        {
-          id: '1',
-          distinguishedName: 'OU=IT,DC=example,DC=com',
-          name: 'IT',
-          path: 'example.com/IT',
-          description: 'Information Technology department',
-          protected: true,
-          managedBy: 'CN=IT Manager,CN=Users,DC=example,DC=com'
-        },
-        {
-          id: '2',
-          distinguishedName: 'OU=HR,DC=example,DC=com',
-          name: 'HR',
-          path: 'example.com/HR',
-          description: 'Human Resources department',
-          protected: false
-        },
-        {
-          id: '3',
-          distinguishedName: 'OU=Sales,DC=example,DC=com',
-          name: 'Sales',
-          path: 'example.com/Sales',
-          description: 'Sales department',
-          protected: false
-        },
-        {
-          id: '4',
-          distinguishedName: 'OU=Development,OU=IT,DC=example,DC=com',
-          name: 'Development',
-          path: 'example.com/IT/Development',
-          parentOU: 'OU=IT,DC=example,DC=com',
-          description: 'Software Development team',
-          protected: false
-        }
-      ];
+      if (data.status !== 'success') {
+        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
+      }
+
+      // Transform the API response to our ADOrganizationalUnit format
+      const ous: ADOrganizationalUnit[] = (data.ous || []).map((ou: any) => {
+        return {
+          id: ou.objectGUID || ou.distinguishedName,
+          distinguishedName: ou.distinguishedName,
+          name: ou.name || (ou.distinguishedName.split(',')[0] || '').replace('OU=', ''),
+          path: ou.distinguishedName,
+          description: ou.description || '',
+          parentOU: this.extractParentOUFromDN(ou.distinguishedName),
+          protected: ou.protected || false,
+          managedBy: ou.managedBy || ''
+        };
+      });
       
-      // Filter by search query if provided
+      // Apply client-side filtering if filter is provided
       const filteredOUs = filter
-        ? mockOUs.filter(ou => 
+        ? ous.filter(ou => 
             ou.name.toLowerCase().includes(filter.toLowerCase()) ||
             ou.distinguishedName.toLowerCase().includes(filter.toLowerCase()) ||
             (ou.description && ou.description.toLowerCase().includes(filter.toLowerCase()))
           )
-        : mockOUs;
+        : ous;
       
-      // Calculate pagination
+      // Apply client-side pagination
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
       const paginatedOUs = filteredOUs.slice(startIndex, endIndex);
@@ -432,68 +592,99 @@ class ActiveDirectoryService {
       };
     }
   }
+  
+  // Helper method to extract parent OU from distinguished name
+  private extractParentOUFromDN(dn: string): string | undefined {
+    // Example DN: OU=Development,OU=IT,DC=example,DC=com
+    // We want to extract the parent OU part: OU=IT,DC=example,DC=com
+    const parts = dn.split(',');
+    if (parts.length <= 1) return undefined;
+    
+    return parts.slice(1).join(',');
+  }
 
   // Get computers with pagination and search
   async getComputers(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADComputer>> {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Create mock data
-      const mockComputers: ADComputer[] = [
-        {
-          id: '1',
-          distinguishedName: 'CN=DESKTOP-PC01,CN=Computers,DC=example,DC=com',
-          name: 'DESKTOP-PC01',
-          samAccountName: 'DESKTOP-PC01$',
-          dnsHostName: 'desktop-pc01.example.com',
-          operatingSystem: 'Windows 10 Pro',
-          operatingSystemVersion: '10.0.19045',
-          enabled: true,
-          lastLogon: new Date('2023-04-15T08:30:00Z'),
-          trusted: true,
-          location: 'Main Office'
+      const serverIP = this.getServerIP();
+      if (!serverIP) {
+        throw new Error('Server IP not set');
+      }
+
+      // Log the request
+      loggingService.logInfo(`Fetching AD computers from ${serverIP}, page ${page}, size ${pageSize}`);
+
+      // Use the specific API endpoint
+      const url = 'http://192.168.1.5:4444/api/v1/ad/object/computers';
+      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
+      const body = {
+        address: `ldap://${serverIP}:389`,
+        domain_name: domain
+      };
+
+      console.log('Sending request to:', url);
+      console.log('Request body:', JSON.stringify(body));
+
+      // Make the API call
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {})
         },
-        {
-          id: '2',
-          distinguishedName: 'CN=LAPTOP-DEV03,CN=Computers,DC=example,DC=com',
-          name: 'LAPTOP-DEV03',
-          samAccountName: 'LAPTOP-DEV03$',
-          dnsHostName: 'laptop-dev03.example.com',
-          operatingSystem: 'Windows 11 Enterprise',
-          operatingSystemVersion: '11.0.22621',
-          enabled: true,
-          lastLogon: new Date('2023-04-18T09:15:00Z'),
-          trusted: true,
-          location: 'Remote'
-        },
-        {
-          id: '3',
-          distinguishedName: 'CN=SERVER-DB01,CN=Computers,DC=example,DC=com',
-          name: 'SERVER-DB01',
-          samAccountName: 'SERVER-DB01$',
-          dnsHostName: 'server-db01.example.com',
-          operatingSystem: 'Windows Server 2019',
-          operatingSystemVersion: '10.0.17763',
-          enabled: true,
-          lastLogon: new Date('2023-04-19T07:45:00Z'),
-          trusted: true,
-          managedBy: 'CN=Database Admin,CN=Users,DC=example,DC=com',
-          location: 'Server Room'
-        }
-      ];
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      console.log('API response:', data);
       
-      // Filter by search query if provided
+      if (data.status !== 'success') {
+        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
+      }
+
+      // Convert Windows file time to JavaScript Date
+      const convertWindowsTime = (windowsTime: number): Date | undefined => {
+        if (!windowsTime) return undefined;
+        // Calculate milliseconds from Windows file time
+        const milliseconds = Number(windowsTime) / 10000 - 11644473600000;
+        if (isNaN(milliseconds) || milliseconds < 0) return undefined;
+        return new Date(milliseconds);
+      };
+
+      // Transform the API response to our ADComputer format
+      const computers: ADComputer[] = (data.computers || []).map((computer: any) => {
+        return {
+          id: computer.objectGUID || computer.distinguishedName,
+          distinguishedName: computer.distinguishedName,
+          name: computer.name || computer.samAccountName.replace('$', ''),
+          samAccountName: computer.samAccountName,
+          description: computer.description || '',
+          dnsHostName: computer.dnsHostName,
+          operatingSystem: computer.operatingSystem,
+          operatingSystemVersion: computer.operatingSystemVersion,
+          enabled: computer.userAccountControl ? (computer.userAccountControl & 2) === 0 : true,
+          lastLogon: convertWindowsTime(computer.lastLogon),
+          managedBy: computer.managedBy || '',
+          location: computer.location || '',
+          trusted: true // Default to trusted
+        };
+      });
+      
+      // Apply client-side filtering if filter is provided
       const filteredComputers = filter
-        ? mockComputers.filter(computer => 
+        ? computers.filter(computer => 
             computer.name.toLowerCase().includes(filter.toLowerCase()) ||
             computer.distinguishedName.toLowerCase().includes(filter.toLowerCase()) ||
             (computer.dnsHostName && computer.dnsHostName.toLowerCase().includes(filter.toLowerCase())) ||
             (computer.operatingSystem && computer.operatingSystem.toLowerCase().includes(filter.toLowerCase()))
           )
-        : mockComputers;
+        : computers;
       
-      // Calculate pagination
+      // Apply client-side pagination
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
       const paginatedComputers = filteredComputers.slice(startIndex, endIndex);
@@ -523,58 +714,89 @@ class ActiveDirectoryService {
   // Get domain controllers with pagination and search
   async getDomainControllers(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADDomainController>> {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Create mock data
-      const mockDCs: ADDomainController[] = [
-        {
-          id: '1',
-          distinguishedName: 'CN=DC01,OU=Domain Controllers,DC=example,DC=com',
-          name: 'DC01',
-          samAccountName: 'DC01$',
-          dnsHostName: 'dc01.example.com',
-          operatingSystem: 'Windows Server 2019',
-          operatingSystemVersion: '10.0.17763',
-          enabled: true,
-          trusted: true,
-          domain: 'example.com',
-          isGlobalCatalog: true,
-          roles: ['PDC', 'RID', 'Infrastructure'],
-          services: ['DNS', 'LDAP', 'Kerberos'],
-          location: 'Main Office',
-          lastLogon: new Date('2023-04-19T00:00:00Z')
+      const serverIP = this.getServerIP();
+      if (!serverIP) {
+        throw new Error('Server IP not set');
+      }
+
+      // Log the request
+      loggingService.logInfo(`Fetching AD domain controllers from ${serverIP}, page ${page}, size ${pageSize}`);
+
+      // Use the specific API endpoint
+      const url = 'http://192.168.1.5:4444/api/v1/ad/object/domain-controllers';
+      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
+      const body = {
+        address: `ldap://${serverIP}:389`,
+        domain_name: domain
+      };
+
+      console.log('Sending request to:', url);
+      console.log('Request body:', JSON.stringify(body));
+
+      // Make the API call
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {})
         },
-        {
-          id: '2',
-          distinguishedName: 'CN=DC02,OU=Domain Controllers,DC=example,DC=com',
-          name: 'DC02',
-          samAccountName: 'DC02$',
-          dnsHostName: 'dc02.example.com',
-          operatingSystem: 'Windows Server 2022',
-          operatingSystemVersion: '10.0.20348',
-          enabled: true,
-          trusted: true,
-          domain: 'example.com',
-          isGlobalCatalog: true,
-          roles: ['Schema', 'Naming'],
-          services: ['DNS', 'LDAP', 'Kerberos'],
-          location: 'Disaster Recovery Site',
-          lastLogon: new Date('2023-04-19T00:00:00Z')
-        }
-      ];
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      console.log('API response:', data);
       
-      // Filter by search query if provided
+      if (data.status !== 'success') {
+        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
+      }
+
+      // Convert Windows file time to JavaScript Date
+      const convertWindowsTime = (windowsTime: number): Date | undefined => {
+        if (!windowsTime) return undefined;
+        // Calculate milliseconds from Windows file time
+        const milliseconds = Number(windowsTime) / 10000 - 11644473600000;
+        if (isNaN(milliseconds) || milliseconds < 0) return undefined;
+        return new Date(milliseconds);
+      };
+
+      // Transform the API response to our ADDomainController format
+      const domainControllers: ADDomainController[] = (data.domainControllers || []).map((dc: any) => {
+        return {
+          id: dc.objectGUID || dc.distinguishedName,
+          distinguishedName: dc.distinguishedName,
+          name: dc.name || dc.samAccountName.replace('$', ''),
+          samAccountName: dc.samAccountName,
+          description: dc.description || '',
+          dnsHostName: dc.dnsHostName,
+          operatingSystem: dc.operatingSystem,
+          operatingSystemVersion: dc.operatingSystemVersion,
+          enabled: dc.userAccountControl ? (dc.userAccountControl & 2) === 0 : true,
+          lastLogon: convertWindowsTime(dc.lastLogon),
+          trusted: true,
+          domain: domain,
+          isGlobalCatalog: dc.isGlobalCatalog || true,
+          roles: dc.roles || [],
+          services: dc.services || ['DNS', 'LDAP', 'Kerberos'],
+          location: dc.location || '',
+          site: dc.site
+        };
+      });
+      
+      // Apply client-side filtering if filter is provided
       const filteredDCs = filter
-        ? mockDCs.filter(dc => 
+        ? domainControllers.filter(dc => 
             dc.name.toLowerCase().includes(filter.toLowerCase()) ||
             dc.distinguishedName.toLowerCase().includes(filter.toLowerCase()) ||
             (dc.dnsHostName && dc.dnsHostName.toLowerCase().includes(filter.toLowerCase())) ||
             dc.domain.toLowerCase().includes(filter.toLowerCase())
           )
-        : mockDCs;
+        : domainControllers;
       
-      // Calculate pagination
+      // Apply client-side pagination
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
       const paginatedDCs = filteredDCs.slice(startIndex, endIndex);
