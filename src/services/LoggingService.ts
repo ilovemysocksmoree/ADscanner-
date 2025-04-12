@@ -25,6 +25,22 @@ class LoggingService {
     localStorage.setItem('applicationLogs', JSON.stringify(logs));
   }
 
+  // Convenience methods
+  logInfo(message: string, context: string = 'application'): void {
+    const systemUser = { id: 'system' } as User;
+    this.addLog(systemUser, 'INFO', message, context);
+  }
+
+  logWarning(message: string, context: string = 'application'): void {
+    const systemUser = { id: 'system' } as User;
+    this.addLog(systemUser, 'WARNING', message, context);
+  }
+
+  logError(message: string, context: string = 'application'): void {
+    const systemUser = { id: 'system' } as User;
+    this.addLog(systemUser, 'ERROR', message, context);
+  }
+
   getLogs(): LogEvent[] {
     const existingLogs = localStorage.getItem('applicationLogs');
     return existingLogs ? JSON.parse(existingLogs) : [];
