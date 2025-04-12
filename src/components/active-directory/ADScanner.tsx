@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Typography, 
   Container, 
   Tabs, 
-  Tab
+  Tab,
+  Button,
+  Alert,
+  Snackbar
 } from '@mui/material';
+import { LogoutOutlined } from '@mui/icons-material';
 
 // Components
 import ConnectionForm from './ConnectionForm';
@@ -13,9 +17,17 @@ import TabPanel from './TabPanel';
 import UsersTab from './tabs/UsersTab';
 import GroupsTab from './tabs/GroupsTab';
 
+// Services
+import { activeDirectoryService } from '../../services/ActiveDirectoryService';
+import { useAuth } from '../../contexts/AuthContext';
+
 const ADScanner: React.FC = () => {
+  const { user } = useAuth();
   const [connected, setConnected] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [serverIP, setServerIP] = useState<string>('');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
   
   // Mock data
   const users = [
@@ -43,26 +55,89 @@ const ADScanner: React.FC = () => {
     { id: 3, name: 'SERVER-001', ip: '192.168.1.10', os: 'Windows Server 2019', lastLogon: '2023-04-12' },
   ];
 
-  const handleConnect = () => {
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      // Disconnect from AD server when component unmounts
+      if (connected) {
+        handleDisconnect(false);
+      }
+    };
+  }, [connected]);
+
+  const handleConnect = (ip: string) => {
+    setServerIP(ip);
     setConnected(true);
+    showSnackbar(`Connected to Active Directory server at ${ip}`);
+  };
+
+  const handleDisconnect = async (showNotification: boolean = true) => {
+    try {
+      await activeDirectoryService.disconnect();
+      
+      if (user) {
+        activeDirectoryService.logOperation(
+          user,
+          'AD_DISCONNECT',
+          `Disconnected from AD server: ${serverIP}`
+        );
+      }
+      
+      if (showNotification) {
+        showSnackbar('Disconnected from Active Directory server');
+      }
+    } catch (error) {
+      console.error('Error during disconnect:', error);
+    } finally {
+      setConnected(false);
+      setServerIP('');
+    }
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
+  const showSnackbar = (message: string) => {
+    setSnackbarMessage(message);
+    setSnackbarOpen(true);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+
   return (
     <Container maxWidth="lg">
       <Box sx={{ mt: 4, mb: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Active Directory Scanner
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h4" gutterBottom>
+            Active Directory Scanner
+          </Typography>
+          {connected && (
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              startIcon={<LogoutOutlined />}
+              onClick={() => handleDisconnect()}
+            >
+              Disconnect
+            </Button>
+          )}
+        </Box>
+        
+        {connected && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Connected to Active Directory server: {serverIP}
+          </Alert>
+        )}
+        
         <Typography variant="body1" color="text.secondary" paragraph>
           Connect to your Active Directory server to manage users, groups, and monitor your domain.
         </Typography>
         
         {!connected ? (
-          <ConnectionForm onConnect={handleConnect} />
+          <ConnectionForm onConnect={(ip: string) => handleConnect(ip)} />
         ) : (
           <Box sx={{ width: '100%' }}>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -94,6 +169,13 @@ const ADScanner: React.FC = () => {
           </Box>
         )}
       </Box>
+
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={snackbarMessage}
+      />
     </Container>
   );
 };

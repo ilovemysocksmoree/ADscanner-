@@ -12,14 +12,24 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
-  Divider
+  Divider,
+  InputAdornment,
+  Tooltip
 } from '@mui/material';
-import { CheckCircle, Close } from '@mui/icons-material';
-import { activeDirectoryService, HealthCheckResponse } from '../../services/ActiveDirectoryService';
+import { 
+  CheckCircle, 
+  Close, 
+  Https, 
+  Lock, 
+  Person, 
+  Public, 
+  Info
+} from '@mui/icons-material';
+import { activeDirectoryService, HealthCheckResponse, ConnectionResponse } from '../../services/ActiveDirectoryService';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ConnectionFormProps {
-  onConnect?: () => void;
+  onConnect?: (serverIP: string) => void;
 }
 
 const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
@@ -33,6 +43,7 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [healthDialogOpen, setHealthDialogOpen] = useState(false);
   const [healthCheckData, setHealthCheckData] = useState<HealthCheckResponse | null>(null);
+  const [connectionData, setConnectionData] = useState<ConnectionResponse | null>(null);
 
   const handleTestConnection = async () => {
     if (!serverIP) {
@@ -50,7 +61,7 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
       setHealthCheckData(data);
       
       if (data.status === 'success' && data.stats.healthy) {
-        setSuccess('Connection test successful!');
+        setSuccess('Connection test successful! Server is healthy and ready.');
         setHealthDialogOpen(true);
         
         // Log the successful health check
@@ -62,10 +73,14 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
           );
         }
       } else {
-        setError('Connection test failed. Server is not healthy.');
+        setError(`Connection test failed. Server reported: ${data.message || 'Unknown error'}`);
       }
     } catch (err) {
-      setError('Failed to connect to Active Directory server');
+      if (err instanceof Error) {
+        setError(`Failed to connect to Active Directory server: ${err.message}`);
+      } else {
+        setError('Failed to connect to Active Directory server: Unknown error');
+      }
       console.error('Health check error:', err);
     } finally {
       setLoading(false);
@@ -84,23 +99,33 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
 
     try {
       // Use the service to connect
-      await activeDirectoryService.connect(serverIP, domain, username, password);
-      setSuccess('Successfully connected to Active Directory!');
+      const data = await activeDirectoryService.connect(serverIP, domain, username, password);
+      setConnectionData(data);
       
-      // Log the successful connection
-      if (user) {
-        activeDirectoryService.logOperation(
-          user,
-          'AD_CONNECT',
-          `Connected to AD server: ${serverIP} with domain: ${domain}`
-        );
-      }
-      
-      if (onConnect) {
-        onConnect();
+      if (data.status === 'success') {
+        setSuccess(`Successfully connected to Active Directory! ${data.message || ''}`);
+        
+        // Log the successful connection
+        if (user) {
+          activeDirectoryService.logOperation(
+            user,
+            'AD_CONNECT',
+            `Connected to AD server: ${serverIP} with domain: ${domain}`
+          );
+        }
+        
+        if (onConnect) {
+          onConnect(serverIP);
+        }
+      } else {
+        setError(`Connection failed: ${data.message || 'Unknown error'}`);
       }
     } catch (err) {
-      setError('Failed to connect to Active Directory');
+      if (err instanceof Error) {
+        setError(`Failed to connect to Active Directory: ${err.message}`);
+      } else {
+        setError('Failed to connect to Active Directory: Unknown error');
+      }
       console.error('Connection error:', err);
     } finally {
       setLoading(false);
@@ -109,6 +134,11 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
 
   const handleCloseHealthDialog = () => {
     setHealthDialogOpen(false);
+  };
+
+  const isIPValid = (ip: string): boolean => {
+    const ipPattern = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return ip ? ipPattern.test(ip) : true;
   };
 
   return (
@@ -143,14 +173,30 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
           fullWidth
           margin="normal"
           disabled={loading}
+          error={serverIP !== '' && !isIPValid(serverIP)}
+          helperText={serverIP !== '' && !isIPValid(serverIP) ? "Please enter a valid IP address" : ""}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Public />
+              </InputAdornment>
+            ),
+            endAdornment: (
+              <InputAdornment position="end">
+                <Tooltip title="Enter the IP address of your Active Directory server">
+                  <Info color="action" fontSize="small" />
+                </Tooltip>
+              </InputAdornment>
+            )
+          }}
         />
 
         <Box sx={{ mt: 2, mb: 3 }}>
           <Button
             variant="contained"
             onClick={handleTestConnection}
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : undefined}
+            disabled={loading || !isIPValid(serverIP) || !serverIP}
+            startIcon={loading ? <CircularProgress size={20} /> : <Https />}
           >
             Test Connection
           </Button>
@@ -169,7 +215,14 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
           onChange={(e) => setDomain(e.target.value)}
           fullWidth
           margin="normal"
-          disabled={loading}
+          disabled={loading || !success}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Public />
+              </InputAdornment>
+            )
+          }}
         />
 
         <TextField
@@ -179,7 +232,14 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
           onChange={(e) => setUsername(e.target.value)}
           fullWidth
           margin="normal"
-          disabled={loading}
+          disabled={loading || !success}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Person />
+              </InputAdornment>
+            )
+          }}
         />
 
         <TextField
@@ -189,14 +249,21 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
           onChange={(e) => setPassword(e.target.value)}
           fullWidth
           margin="normal"
-          disabled={loading}
+          disabled={loading || !success}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Lock />
+              </InputAdornment>
+            )
+          }}
         />
 
         <Box sx={{ mt: 3 }}>
           <Button
             variant="contained"
             onClick={handleConnect}
-            disabled={loading || !success}
+            disabled={loading || !success || !domain || !username || !password}
             startIcon={loading ? <CircularProgress size={20} /> : undefined}
             color="primary"
           >
