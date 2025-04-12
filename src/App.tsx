@@ -9,11 +9,11 @@ import Dashboard from './pages/Dashboard';
 import VulnerabilityScanner from './pages/VulnerabilityScanner';
 import NetworkScanner from './pages/NetworkScanner';
 import Reports from './pages/Reports';
-import ADScanner from './pages/ADScanner';
 import Login from './pages/Login';
 import Profile from './components/Profile';
 import ConfirmAccount from './pages/ConfirmAccount';
 import TrustIPAnalytics from './pages/TrustIPAnalytics';
+import ADScanner from './pages/active-directory/ADScanner';
 
 // Admin pages
 import DomainGroups from './pages/admin/DomainGroups';
