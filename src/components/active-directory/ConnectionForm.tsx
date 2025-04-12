@@ -29,7 +29,7 @@ import {
   Public, 
   Info,
   CheckCircleOutline,
-  Error,
+  Error as ErrorIcon,
   HourglassEmpty
 } from '@mui/icons-material';
 import { activeDirectoryService } from '../../services/ActiveDirectoryService';
@@ -197,20 +197,33 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
         };
         
         console.log('Testing direct API access to:', testUrl);
+        console.log('Request body:', JSON.stringify(testBody));
+        
         const testResponse = await fetch(testUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(testBody)
         });
         
+        console.log('API test response status:', testResponse.status);
+        
+        if (!testResponse.ok) {
+          const errorText = await testResponse.text();
+          console.error('API test error response:', errorText);
+          throw new Error(`API test failed with status ${testResponse.status}: ${errorText}`);
+        }
+        
         const testData = await testResponse.json();
-        console.log('Direct API test response:', testData);
+        console.log('API test response data:', testData);
         
         if (testData && testData.users) {
           console.log(`Direct API test success! Found ${testData.users.length} users.`);
+        } else {
+          console.warn('API responded but no users data found:', testData);
         }
       } catch (apiTestError) {
         console.error('Direct API test failed:', apiTestError);
+        // We'll continue with the connection process anyway
       }
 
       // Use the service to connect
@@ -415,7 +428,7 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
                   {step.status === 'pending' && <HourglassEmpty color="disabled" />}
                   {step.status === 'checking' && <CircularProgress size={24} />}
                   {step.status === 'success' && <CheckCircleOutline color="success" />}
-                  {step.status === 'error' && <Error color="error" />}
+                  {step.status === 'error' && <ErrorIcon color="error" />}
                 </ListItemIcon>
                 <ListItemText 
                   primary={step.label} 

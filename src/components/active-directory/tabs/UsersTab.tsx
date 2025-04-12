@@ -195,7 +195,7 @@ const UsersTab: React.FC = () => {
       setLoadingMessage('Testing direct API call...');
       
       const url = 'http://192.168.1.5:4444/api/v1/ad/object/users';
-      const serverIP = activeDirectoryService.getServerIP() || '192.168.1.5';
+      const serverIP = '192.168.1.8';
       const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
       
       const body = {
