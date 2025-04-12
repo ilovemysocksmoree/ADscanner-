@@ -218,8 +218,8 @@ const UsersTab: React.FC = () => {
       console.log('Direct test - Response data:', data);
       
       if (data.users && data.users.length > 0) {
-        // Just show the first 5 users for testing
-        setUsers(data.users.slice(0, 5).map((u: any) => ({
+        // Display all users from the response
+        setUsers(data.users.map((u: any) => ({
           id: u.objectGUID || u.distinguishedName,
           distinguishedName: u.distinguishedName,
           name: u.displayName || u.samAccountName,
@@ -229,8 +229,8 @@ const UsersTab: React.FC = () => {
           firstName: u.givenName || '',
           lastName: u.surName || '',
           email: u.mail || '',
-          enabled: true,
-          locked: false,
+          enabled: !(u.userAccountControl & 2), // Check disabled bit
+          locked: !!(u.userAccountControl & 16), // Check locked bit
           groups: u.memberof || [],
           description: u.description || ''
         })));

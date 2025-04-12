@@ -219,16 +219,106 @@ export class ActiveDirectoryService {
         throw new Error('Server not configured');
       }
 
-      if (API_CONFIG.DEBUG) {
-        // Use mock data for development
-        return this.mockApiService.getUsers(page, pageSize, searchQuery, showDisabled);
+      // Use the specific API endpoint
+      const url = `${API_CONFIG.AD_API_BASE_URL}/object/users`;
+      const serverIP = this.getServerIP();
+      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
+      
+      const body = {
+        address: `ldap://${serverIP}:389`,
+        domain_name: domain
+      };
+
+      console.log('Fetching users from:', url);
+      console.log('Request body:', JSON.stringify(body));
+
+      // Make the API call
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {})
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
       }
 
-      // Use the correct API endpoint from API_CONFIG
-      const apiUrl = `${API_CONFIG.AD_API_BASE_URL}${API_CONFIG.ENDPOINTS.USERS}`;
-      console.log('Fetching users from:', apiUrl);
+      const data = await response.json();
+      console.log('API response:', data);
+      
+      if (data.status !== 'success') {
+        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
+      }
 
-      // Rest of implementation
+      // Transform the API response to our ADUser format
+      const users: ADUser[] = (data.users || []).map((user: any) => {
+        return {
+          id: user.objectGUID || user.distinguishedName,
+          distinguishedName: user.distinguishedName,
+          name: user.displayName || user.samAccountName,
+          displayName: user.displayName || user.samAccountName,
+          samAccountName: user.samAccountName,
+          userPrincipalName: user.userPrincipalName || '',
+          firstName: user.givenName || '',
+          lastName: user.surName || '',
+          email: user.mail || '',
+          enabled: !(user.userAccountControl & 2), // Check disabled bit
+          locked: !!(user.userAccountControl & 16), // Check locked bit
+          description: user.description || '',
+          title: user.title || '',
+          department: user.department || '',
+          phoneNumber: user.telephoneNumber || user.mobile || '',
+          groups: user.memberof || [],
+          created: user.whenCreated ? new Date(user.whenCreated) : undefined,
+          modified: user.whenChanged ? new Date(user.whenChanged) : undefined,
+          lastLogon: user.lastLogon ? this.windowsTimeToDate(user.lastLogon) : undefined
+        };
+      });
+      
+      // Apply client-side filtering
+      let filteredUsers = users;
+      
+      // Filter by search query if provided
+      if (searchQuery) {
+        filteredUsers = filteredUsers.filter(user => 
+          (user.displayName && user.displayName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (user.samAccountName && user.samAccountName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (user.department && user.department.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+      }
+      
+      // Apply show/hide disabled filter
+      if (!showDisabled) {
+        filteredUsers = filteredUsers.filter(user => user.enabled);
+      }
+      
+      // Apply client-side pagination
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+      
+      return {
+        items: paginatedUsers,
+        totalCount: filteredUsers.length,
+        page,
+        pageSize,
+        hasMore: endIndex < filteredUsers.length
+      };
+      
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      loggingService.logError(`Failed to fetch users: ${error instanceof Error ? error.message : String(error)}`);
+      
+      if (API_CONFIG.DEBUG) {
+        // Fall back to mock data for development
+        return this.mockApiService.getUsers(page, pageSize, searchQuery, showDisabled);
+      }
+      
+      // Return empty response on error
       return {
         items: [],
         totalCount: 0,
@@ -236,11 +326,23 @@ export class ActiveDirectoryService {
         pageSize,
         hasMore: false
       };
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      loggingService.logError(`Failed to fetch users: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // Helper method to convert Windows file time to JavaScript Date
+  private windowsTimeToDate(windowsTime: string | number): Date | undefined {
+    try {
+      // Windows file time is in 100-nanosecond intervals since January 1, 1601 UTC
+      // JavaScript time is in milliseconds since January 1, 1970 UTC
+      const windowsTimeNumber = typeof windowsTime === 'string' ? parseInt(windowsTime, 10) : windowsTime;
+      if (!windowsTimeNumber || windowsTimeNumber === 0) return undefined;
       
-      throw error;
+      // Convert by dividing by 10000 (to get milliseconds) and subtracting difference between epochs
+      const jsTime = windowsTimeNumber / 10000 - 11644473600000;
+      return new Date(jsTime);
+    } catch (error) {
+      console.error('Error converting Windows time:', error);
+      return undefined;
     }
   }
 
