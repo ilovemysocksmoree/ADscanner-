@@ -1,253 +1,294 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
-  Button,
-  TableContainer,
+  Paper,
   Table,
+  TableBody,
+  TableCell,
+  TableContainer,
   TableHead,
   TableRow,
-  TableCell,
-  TableBody,
-  Paper,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  TablePagination,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Divider
+  InputAdornment,
+  IconButton,
+  Button,
+  Chip,
+  CircularProgress,
+  Toolbar,
+  Tooltip
 } from '@mui/material';
 import {
-  GroupAdd,
+  Search,
+  Add,
   Edit,
   Delete,
-  GroupRemove
+  Refresh,
+  Clear
 } from '@mui/icons-material';
+import { loggingService } from '../../../services/LoggingService';
 
-interface User {
-  id: number;
-  username: string;
-  fullName: string;
-  email: string;
-  status: string;
-  groups: string[];
-  ou: string;
-}
-
-interface Group {
-  id: number;
+// Placeholder until we can import from the models
+interface ADGroup {
+  id: string;
   name: string;
-  members: number;
-  description: string;
+  description?: string;
+  groupType: string;
+  groupScope: string;
+  memberCount: number;
 }
 
-interface GroupsTabProps {
-  groups: Group[];
-  users: User[];
-}
+const GroupsTab: React.FC = () => {
+  const [groups, setGroups] = useState<ADGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalGroups, setTotalGroups] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
-const GroupsTab: React.FC<GroupsTabProps> = ({ groups, users }) => {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalAction, setModalAction] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  useEffect(() => {
+    // For now, just set loading to false after a delay
+    const timer = setTimeout(() => {
+      setLoading(false);
+      setGroups([
+        {
+          id: '1',
+          name: 'Domain Admins',
+          description: 'Designated administrators of the domain',
+          groupType: 'Security',
+          groupScope: 'Global',
+          memberCount: 5
+        },
+        {
+          id: '2',
+          name: 'Marketing Department',
+          description: 'All marketing staff',
+          groupType: 'Distribution',
+          groupScope: 'Universal',
+          memberCount: 12
+        }
+      ]);
+      setTotalGroups(2);
+    }, 1500);
+    
+    // In production, we would fetch real data
+    // fetchGroups();
+    
+    return () => clearTimeout(timer);
+  }, []);
 
-  const handleOpenModal = (action: string, group?: Group) => {
-    setModalAction(action);
-    if (group) {
-      setSelectedGroup(group);
-    } else {
-      setSelectedGroup(null);
-    }
-    setModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setModalOpen(false);
-  };
-
-  const getModalContent = () => {
-    switch (modalAction) {
-      case 'addGroup':
-        return (
-          <>
-            <DialogTitle>Create New Group</DialogTitle>
-            <DialogContent>
-              <TextField fullWidth margin="dense" label="Group Name" variant="outlined" />
-              <TextField fullWidth margin="dense" label="Description" variant="outlined" multiline rows={2} />
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Group Type</InputLabel>
-                <Select label="Group Type">
-                  <MenuItem value="Security">Security</MenuItem>
-                  <MenuItem value="Distribution">Distribution</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Group Scope</InputLabel>
-                <Select label="Group Scope">
-                  <MenuItem value="Domain Local">Domain Local</MenuItem>
-                  <MenuItem value="Global">Global</MenuItem>
-                  <MenuItem value="Universal">Universal</MenuItem>
-                </Select>
-              </FormControl>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseModal}>Cancel</Button>
-              <Button variant="contained" color="primary">Create Group</Button>
-            </DialogActions>
-          </>
-        );
+  const fetchGroups = async () => {
+    try {
+      setLoading(true);
       
-      case 'modifyGroup':
-        return (
-          <>
-            <DialogTitle>
-              {selectedGroup ? `Modify Group: ${selectedGroup.name}` : 'Modify Group'}
-            </DialogTitle>
-            <DialogContent>
-              {selectedGroup ? (
-                <>
-                  <TextField 
-                    fullWidth 
-                    margin="dense" 
-                    label="Group Name" 
-                    variant="outlined" 
-                    defaultValue={selectedGroup.name}
-                  />
-                  <TextField 
-                    fullWidth 
-                    margin="dense" 
-                    label="Description" 
-                    variant="outlined" 
-                    multiline 
-                    rows={2}
-                    defaultValue={selectedGroup.description}
-                  />
-                  <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle1">Add Members</Typography>
-                  <FormControl fullWidth margin="dense">
-                    <InputLabel>Available Users</InputLabel>
-                    <Select multiple label="Available Users">
-                      {users
-                        .filter(user => !user.groups.includes(selectedGroup.name))
-                        .map(user => (
-                          <MenuItem key={user.id} value={user.username}>
-                            {user.fullName} ({user.username})
-                          </MenuItem>
-                        ))}
-                    </Select>
-                  </FormControl>
-                  <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-                    <Button startIcon={<GroupAdd />} variant="outlined">
-                      Add to Group
-                    </Button>
-                  </Box>
-                  <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle1">Current Members</Typography>
-                  <TableContainer component={Paper} sx={{ mt: 1 }}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Username</TableCell>
-                          <TableCell>Full Name</TableCell>
-                          <TableCell align="right">Action</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {users
-                          .filter(user => user.groups.includes(selectedGroup.name))
-                          .map(user => (
-                            <TableRow key={user.id}>
-                              <TableCell>{user.username}</TableCell>
-                              <TableCell>{user.fullName}</TableCell>
-                              <TableCell align="right">
-                                <IconButton size="small" color="error">
-                                  <GroupRemove fontSize="small" />
-                                </IconButton>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </>
-              ) : (
-                <FormControl fullWidth margin="dense">
-                  <InputLabel>Select Group</InputLabel>
-                  <Select label="Select Group">
-                    {groups.map(group => (
-                      <MenuItem key={group.id} value={group.name}>{group.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseModal}>Cancel</Button>
-              <Button variant="contained" color="primary">Save Changes</Button>
-            </DialogActions>
-          </>
-        );
-
-      default:
-        return null;
+      // Make sure page is a valid number (1-based for API)
+      const currentPage = Math.max(page + 1, 1);
+      
+      // Simulated fetch
+      // In production this would be an actual API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const mockGroups = [
+        {
+          id: '1',
+          name: 'Domain Admins',
+          description: 'Designated administrators of the domain',
+          groupType: 'Security',
+          groupScope: 'Global',
+          memberCount: 5
+        },
+        {
+          id: '2',
+          name: 'Marketing Department',
+          description: 'All marketing staff',
+          groupType: 'Distribution',
+          groupScope: 'Universal',
+          memberCount: 12
+        }
+      ];
+      
+      // Filter by search query if provided
+      const filteredGroups = searchQuery
+        ? mockGroups.filter(g => 
+            g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (g.description && g.description.toLowerCase().includes(searchQuery.toLowerCase()))
+          )
+        : mockGroups;
+      
+      setGroups(filteredGroups);
+      setTotalGroups(filteredGroups.length);
+      loggingService.logInfo(`Loaded ${filteredGroups.length} groups`);
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+      loggingService.logError(`Failed to load groups: ${error}`);
+      
+      // Set empty state on error
+      setGroups([]);
+      setTotalGroups(0);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+    setPage(0);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setPage(0);
+  };
+
+  const handleRefresh = () => {
+    fetchGroups();
   };
 
   return (
-    <>
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6">Groups Management</Typography>
-        <Box>
-          <Button 
-            variant="contained" 
-            startIcon={<GroupAdd />} 
-            sx={{ mr: 1 }}
-            onClick={() => handleOpenModal('addGroup')}
+    <Box>
+      <Toolbar
+        sx={{
+          pl: { sm: 2 },
+          pr: { xs: 1, sm: 1 },
+          bgcolor: 'background.paper',
+          borderRadius: 1,
+          mb: 2,
+          display: 'flex',
+          justifyContent: 'space-between'
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}
           >
-            Create Group
-          </Button>
-          <Button 
-            variant="outlined" 
-            startIcon={<Edit />}
-            onClick={() => handleOpenModal('modifyGroup')}
+            Groups
+            {loading && <CircularProgress size={24} sx={{ ml: 2 }} />}
+            {!loading && (
+              <Chip 
+                label={`${totalGroups} total`} 
+                size="small" 
+                sx={{ ml: 2 }} 
+                color="primary"
+              />
+            )}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex' }}>
+          <TextField
+            placeholder="Search groups..."
+            size="small"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            sx={{ mr: 2, width: 250 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery && (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={handleClearSearch}
+                    edge="end"
+                  >
+                    <Clear fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
+
+          <Tooltip title="Refresh">
+            <IconButton onClick={handleRefresh} disabled={loading}>
+              <Refresh />
+            </IconButton>
+          </Tooltip>
+
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            sx={{ ml: 2 }}
           >
-            Manage Members
+            Add Group
           </Button>
         </Box>
-      </Box>
-      
+      </Toolbar>
+
       <TableContainer component={Paper}>
-        <Table>
+        <Table sx={{ minWidth: 650 }} size="medium">
           <TableHead>
             <TableRow>
-              <TableCell>Group Name</TableCell>
+              <TableCell>Name</TableCell>
               <TableCell>Description</TableCell>
+              <TableCell>Type</TableCell>
+              <TableCell>Scope</TableCell>
               <TableCell>Members</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {groups.map((group) => (
+            {loading && Array.from(new Array(5)).map((_, index) => (
+              <TableRow key={index}>
+                <TableCell colSpan={6} align="center">
+                  <CircularProgress size={20} />
+                </TableCell>
+              </TableRow>
+            ))}
+            
+            {!loading && groups.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  No groups found
+                </TableCell>
+              </TableRow>
+            )}
+            
+            {!loading && groups.map((group) => (
               <TableRow key={group.id}>
                 <TableCell>{group.name}</TableCell>
-                <TableCell>{group.description}</TableCell>
-                <TableCell>{group.members}</TableCell>
-                <TableCell align="right">
-                  <IconButton 
+                <TableCell>{group.description || 'N/A'}</TableCell>
+                <TableCell>
+                  <Chip 
+                    label={group.groupType} 
                     size="small" 
-                    color="primary"
-                    onClick={() => handleOpenModal('modifyGroup', group)}
-                  >
-                    <Edit fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" color="error">
-                    <Delete fontSize="small" />
-                  </IconButton>
+                    color={group.groupType === 'Security' ? "primary" : "default"}
+                  />
+                </TableCell>
+                <TableCell>{group.groupScope}</TableCell>
+                <TableCell>{group.memberCount}</TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex' }}>
+                    <Tooltip title="Edit">
+                      <IconButton
+                        size="small"
+                        color="primary"
+                      >
+                        <Edit fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton
+                        size="small"
+                        color="error"
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}
@@ -255,15 +296,16 @@ const GroupsTab: React.FC<GroupsTabProps> = ({ groups, users }) => {
         </Table>
       </TableContainer>
       
-      <Dialog 
-        open={modalOpen} 
-        onClose={handleCloseModal} 
-        maxWidth="sm" 
-        fullWidth
-      >
-        {getModalContent()}
-      </Dialog>
-    </>
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        component="div"
+        count={totalGroups}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+      />
+    </Box>
   );
 };
 

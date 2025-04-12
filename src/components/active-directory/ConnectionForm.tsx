@@ -32,8 +32,7 @@ import {
   Error,
   HourglassEmpty
 } from '@mui/icons-material';
-import { activeDirectoryService, HealthCheckResponse, ConnectionResponse } from '../../services/ActiveDirectoryService';
-import { useAuth } from '../../contexts/AuthContext';
+import { activeDirectoryService } from '../../services/ActiveDirectoryService';
 import { loggingService } from '../../services/LoggingService';
 
 interface ConnectionFormProps {
@@ -48,7 +47,6 @@ interface CheckStep {
 }
 
 const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
-  const { user } = useAuth();
   const [serverIP, setServerIP] = useState('');
   const [domain, setDomain] = useState('');
   const [username, setUsername] = useState('');
@@ -57,8 +55,6 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [healthDialogOpen, setHealthDialogOpen] = useState(false);
-  const [healthCheckData, setHealthCheckData] = useState<HealthCheckResponse | null>(null);
-  const [connectionData, setConnectionData] = useState<ConnectionResponse | null>(null);
   const [checkSteps, setCheckSteps] = useState<CheckStep[]>([
     { id: 'server', label: 'Server Reachability', status: 'pending' },
     { id: 'network', label: 'Network Connection', status: 'pending' },
@@ -141,29 +137,11 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
       
       // Use the service to check health
       const data = await activeDirectoryService.checkHealth(serverIP);
-      setHealthCheckData(data);
       
       if (data.status === 'success' && data.stats.healthy) {
         updateCheckStep('health', 'success', 'Server is healthy and ready');
         setSuccess('Connection test successful! Server is healthy and ready.');
-        
-        // Log the successful health check
-        if (user) {
-          activeDirectoryService.logOperation(
-            user,
-            'AD_HEALTH_CHECK',
-            `Health check successful for server: ${serverIP}`
-          );
-        }
-        
-        // Check if this was a mock response (mock responses have a fixed health_check_success value of 1)
-        if (data.stats.health_check_success === 1 && 
-            data.message === "successfully health-checked") {
-          setSuccess('Successfully connected to Active Directory server! (Development Mode)');
-          loggingService.logInfo(`Mock connection successful to AD server: ${serverIP}`);
-        } else {
-          loggingService.logInfo(`Connection successful to AD server: ${serverIP}`);
-        }
+        loggingService.logInfo(`Connection successful to AD server: ${serverIP}`);
       } else {
         updateCheckStep('health', 'error', data.message || 'Unknown error');
         setError(`Connection test failed. Server reported: ${data.message || 'Unknown error'}`);
@@ -171,7 +149,7 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
       }
     } catch (err) {
       console.error('Full error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage = err instanceof Error ? err.message : String(err);
       loggingService.logError(`Failed to connect to AD server: ${errorMessage}`);
       
       // Update the appropriate step to error state
@@ -212,19 +190,10 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
     try {
       // Use the service to connect
       const data = await activeDirectoryService.connect(serverIP, domain, username, password);
-      setConnectionData(data);
       
       if (data.status === 'success') {
         setSuccess(`Successfully connected to Active Directory! ${data.message || ''}`);
-        
-        // Log the successful connection
-        if (user) {
-          activeDirectoryService.logOperation(
-            user,
-            'AD_CONNECT',
-            `Connected to AD server: ${serverIP} with domain: ${domain}`
-          );
-        }
+        loggingService.logInfo(`Connected to AD server: ${serverIP} with domain: ${domain}`);
         
         if (onConnect) {
           onConnect(serverIP);
@@ -236,7 +205,7 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
       if (err instanceof Error) {
         setError(`Failed to connect to Active Directory: ${err.message}`);
       } else {
-        setError('Failed to connect to Active Directory: Unknown error');
+        setError(`Failed to connect to Active Directory: ${String(err)}`);
       }
       console.error('Connection error:', err);
     } finally {
@@ -347,7 +316,7 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
 
         <TextField
           label="Username"
-          placeholder="e.g., administrator or admin@example.com"
+          placeholder="e.g., Administrator"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           fullWidth
@@ -411,7 +380,8 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
             <Close />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ minWidth: '500px' }}>
+        
+        <DialogContent>
           <Typography variant="subtitle1" gutterBottom>
             Connection to: {serverIP}
           </Typography>
@@ -433,7 +403,7 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
             ))}
           </List>
           
-          {healthCheckData && checkSteps.every(step => step.status === 'success') && (
+          {checkSteps.every(step => step.status === 'success') && (
             <Alert severity="success" sx={{ mt: 2 }}>
               All checks passed successfully! The Active Directory server is healthy and ready for connection.
             </Alert>

@@ -1,261 +1,258 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
-  Button,
-  TableContainer,
+  Paper,
   Table,
+  TableBody,
+  TableCell,
+  TableContainer,
   TableHead,
   TableRow,
-  TableCell,
-  TableBody,
-  Paper,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  TablePagination,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip
+  InputAdornment,
+  IconButton,
+  Button,
+  Chip,
+  CircularProgress,
+  Toolbar,
+  Tooltip
 } from '@mui/material';
 import {
-  PersonAdd,
+  Search,
+  Add,
   Edit,
   Delete,
-  CheckCircle,
-  Cancel
+  Refresh,
+  Clear
 } from '@mui/icons-material';
+import { activeDirectoryService } from '../../../services/ActiveDirectoryService';
+import { loggingService } from '../../../services/LoggingService';
 
-interface User {
-  id: number;
-  username: string;
-  fullName: string;
-  email: string;
-  status: string;
-  groups: string[];
-  ou: string;
-}
+const UsersTab: React.FC = () => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
-interface UsersTabProps {
-  users: User[];
-  groups: { id: number; name: string; members: number; description: string }[];
-  ous: { id: number; name: string; parent: string; objects: number }[];
-}
+  useEffect(() => {
+    fetchUsers();
+  }, [page, rowsPerPage]);
 
-const UsersTab: React.FC<UsersTabProps> = ({ users, groups, ous }) => {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalAction, setModalAction] = useState('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-
-  const handleOpenModal = (action: string, user?: User) => {
-    setModalAction(action);
-    if (user) {
-      setSelectedUser(user);
-    } else {
-      setSelectedUser(null);
-    }
-    setModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setModalOpen(false);
-  };
-
-  const getModalContent = () => {
-    switch (modalAction) {
-      case 'addUser':
-        return (
-          <>
-            <DialogTitle>Add New User</DialogTitle>
-            <DialogContent>
-              <TextField fullWidth margin="dense" label="Username" variant="outlined" />
-              <TextField fullWidth margin="dense" label="Full Name" variant="outlined" />
-              <TextField fullWidth margin="dense" label="Email" variant="outlined" />
-              <TextField fullWidth margin="dense" label="Password" type="password" variant="outlined" />
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Organizational Unit</InputLabel>
-                <Select label="Organizational Unit">
-                  {ous.map(ou => (
-                    <MenuItem key={ou.id} value={ou.name}>{ou.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Groups</InputLabel>
-                <Select multiple label="Groups">
-                  {groups.map(group => (
-                    <MenuItem key={group.id} value={group.name}>{group.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseModal}>Cancel</Button>
-              <Button variant="contained" color="primary">Add User</Button>
-            </DialogActions>
-          </>
-        );
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
       
-      case 'modifyUser':
-        return (
-          <>
-            <DialogTitle>Modify User</DialogTitle>
-            <DialogContent>
-              {selectedUser ? (
-                <>
-                  <TextField 
-                    fullWidth 
-                    margin="dense" 
-                    label="Username" 
-                    variant="outlined" 
-                    defaultValue={selectedUser.username}
-                    disabled
-                  />
-                  <TextField 
-                    fullWidth 
-                    margin="dense" 
-                    label="Full Name" 
-                    variant="outlined" 
-                    defaultValue={selectedUser.fullName}
-                  />
-                  <TextField 
-                    fullWidth 
-                    margin="dense" 
-                    label="Email" 
-                    variant="outlined" 
-                    defaultValue={selectedUser.email}
-                  />
-                  <TextField fullWidth margin="dense" label="Reset Password" type="password" variant="outlined" />
-                  <FormControl fullWidth margin="dense">
-                    <InputLabel>Status</InputLabel>
-                    <Select 
-                      label="Status"
-                      defaultValue={selectedUser.status}
-                    >
-                      <MenuItem value="Active">Active</MenuItem>
-                      <MenuItem value="Disabled">Disabled</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <FormControl fullWidth margin="dense">
-                    <InputLabel>Organizational Unit</InputLabel>
-                    <Select 
-                      label="Organizational Unit"
-                      defaultValue={selectedUser.ou}
-                    >
-                      {ous.map(ou => (
-                        <MenuItem key={ou.id} value={ou.name}>{ou.name}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </>
-              ) : (
-                <FormControl fullWidth margin="dense">
-                  <InputLabel>Select User</InputLabel>
-                  <Select label="Select User">
-                    {users.map(user => (
-                      <MenuItem key={user.id} value={user.username}>{user.fullName} ({user.username})</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseModal}>Cancel</Button>
-              <Button variant="contained" color="primary">Save Changes</Button>
-            </DialogActions>
-          </>
-        );
-
-      default:
-        return null;
+      // Make sure page is a valid number (1-based for API)
+      const currentPage = Math.max(page + 1, 1);
+      
+      const response = await activeDirectoryService.getUsers(
+        currentPage, 
+        rowsPerPage, 
+        searchQuery || ''
+      );
+      
+      // Check if response or items is null or undefined
+      if (!response || !response.items) {
+        console.error('Received invalid response from API');
+        setUsers([]);
+        setTotalUsers(0);
+        return;
+      }
+      
+      // Set the data
+      setUsers(response.items);
+      setTotalUsers(response.totalCount || 0);
+      loggingService.logInfo(`Loaded ${response.items.length} users`);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      loggingService.logError(`Failed to load users: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Set empty state on error
+      setUsers([]);
+      setTotalUsers(0);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  };
+
+  const handleSearch = () => {
+    setPage(0);
+    fetchUsers();
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setPage(0);
+    fetchUsers();
+  };
+
+  const handleRefresh = () => {
+    fetchUsers();
   };
 
   return (
-    <>
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6">Users Management</Typography>
-        <Box>
-          <Button 
-            variant="contained" 
-            startIcon={<PersonAdd />} 
-            sx={{ mr: 1 }}
-            onClick={() => handleOpenModal('addUser')}
+    <Box>
+      <Toolbar
+        sx={{
+          pl: { sm: 2 },
+          pr: { xs: 1, sm: 1 },
+          bgcolor: 'background.paper',
+          borderRadius: 1,
+          mb: 2,
+          display: 'flex',
+          justifyContent: 'space-between'
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}
+          >
+            Users
+            {loading && <CircularProgress size={24} sx={{ ml: 2 }} />}
+            {!loading && (
+              <Chip 
+                label={`${totalUsers} total`} 
+                size="small" 
+                sx={{ ml: 2 }} 
+                color="primary"
+              />
+            )}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex' }}>
+          <TextField
+            placeholder="Search users..."
+            size="small"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            sx={{ mr: 2, width: 250 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery && (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={handleClearSearch}
+                    edge="end"
+                  >
+                    <Clear fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
+
+          <Tooltip title="Refresh">
+            <IconButton onClick={handleRefresh} disabled={loading}>
+              <Refresh />
+            </IconButton>
+          </Tooltip>
+
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            sx={{ ml: 2 }}
           >
             Add User
           </Button>
-          <Button 
-            variant="outlined" 
-            startIcon={<Edit />}
-            onClick={() => handleOpenModal('modifyUser')}
-          >
-            Modify User
-          </Button>
         </Box>
-      </Box>
-      
+      </Toolbar>
+
       <TableContainer component={Paper}>
-        <Table>
+        <Table sx={{ minWidth: 650 }} size="medium">
           <TableHead>
             <TableRow>
+              <TableCell>Name</TableCell>
               <TableCell>Username</TableCell>
-              <TableCell>Full Name</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Groups</TableCell>
-              <TableCell>OU</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.map((user) => (
+            {loading && Array.from(new Array(5)).map((_, index) => (
+              <TableRow key={index}>
+                <TableCell colSpan={6} align="center">
+                  <CircularProgress size={20} />
+                </TableCell>
+              </TableRow>
+            ))}
+            
+            {!loading && users.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  No users found
+                </TableCell>
+              </TableRow>
+            )}
+            
+            {!loading && users.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{user.username}</TableCell>
-                <TableCell>{user.fullName}</TableCell>
-                <TableCell>{user.email}</TableCell>
+                <TableCell>{user.displayName}</TableCell>
+                <TableCell>{user.samAccountName}</TableCell>
+                <TableCell>{user.email || 'N/A'}</TableCell>
                 <TableCell>
-                  {user.status === 'Active' ? (
+                  <Chip 
+                    label={user.enabled ? "Active" : "Disabled"} 
+                    size="small" 
+                    color={user.enabled ? "success" : "error"}
+                  />
+                </TableCell>
+                <TableCell>
+                  {user.groups && user.groups.length > 0 ? (
                     <Chip 
-                      icon={<CheckCircle fontSize="small" />} 
-                      label="Active" 
-                      color="success" 
+                      label={`${user.groups.length} groups`} 
                       size="small" 
+                      color="default"
                     />
                   ) : (
-                    <Chip 
-                      icon={<Cancel fontSize="small" />} 
-                      label="Disabled" 
-                      color="error" 
-                      size="small" 
-                    />
+                    'None'
                   )}
                 </TableCell>
                 <TableCell>
-                  {user.groups.map((group, index) => (
-                    <Chip 
-                      key={index} 
-                      label={group} 
-                      size="small" 
-                      sx={{ mr: 0.5, mb: 0.5 }} 
-                    />
-                  ))}
-                </TableCell>
-                <TableCell>{user.ou}</TableCell>
-                <TableCell align="right">
-                  <IconButton 
-                    size="small" 
-                    color="primary"
-                    onClick={() => handleOpenModal('modifyUser', user)}
-                  >
-                    <Edit fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" color="error">
-                    <Delete fontSize="small" />
-                  </IconButton>
+                  <Box sx={{ display: 'flex' }}>
+                    <Tooltip title="Edit">
+                      <IconButton
+                        size="small"
+                        color="primary"
+                      >
+                        <Edit fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton
+                        size="small"
+                        color="error"
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}
@@ -263,10 +260,16 @@ const UsersTab: React.FC<UsersTabProps> = ({ users, groups, ous }) => {
         </Table>
       </TableContainer>
       
-      <Dialog open={modalOpen} onClose={handleCloseModal} maxWidth="sm" fullWidth>
-        {getModalContent()}
-      </Dialog>
-    </>
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        component="div"
+        count={totalUsers}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+      />
+    </Box>
   );
 };
 

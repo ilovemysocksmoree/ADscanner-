@@ -26,17 +26,17 @@ class LoggingService {
   }
 
   // Convenience methods
-  logInfo(message: string, context: string = 'application'): void {
+  logInfo(message: string, context: string = '{}'): void {
     const systemUser = { id: 'system' } as User;
     this.addLog(systemUser, 'INFO', message, context);
   }
 
-  logWarning(message: string, context: string = 'application'): void {
+  logWarning(message: string, context: string = '{}'): void {
     const systemUser = { id: 'system' } as User;
     this.addLog(systemUser, 'WARNING', message, context);
   }
 
-  logError(message: string, context: string = 'application'): void {
+  logError(message: string, context: string = '{}'): void {
     const systemUser = { id: 'system' } as User;
     this.addLog(systemUser, 'ERROR', message, context);
   }

@@ -1,7 +1,17 @@
-import { User } from '../interfaces/common';
-import { AD_API_BASE_URL, API_REQUEST_TIMEOUT, AD_API_ENDPOINTS, USE_CORS_PROXY, CORS_PROXY_URL, DIRECT_API_BASE_URL } from '../constants/apiConfig';
+import { loggingService } from './LoggingService';
+import { 
+  ADEntity, 
+  ADUser, 
+  ADGroup, 
+  ADOrganizationalUnit,
+  ADComputer,
+  ADDomainController,
+  ADGroupPolicy,
+  PaginatedResponse,
+  ADSearchParams
+} from '../models/ad-entities';
 
-// Health check response interface
+// Define interfaces for API responses
 export interface HealthCheckResponse {
   description: string;
   message: string;
@@ -13,7 +23,6 @@ export interface HealthCheckResponse {
   status: string;
 }
 
-// Connection response interface
 export interface ConnectionResponse {
   message: string;
   token?: string;
@@ -26,124 +35,51 @@ export interface ConnectionResponse {
   };
 }
 
+// Remove the internal interface definitions that are now imported from models
+
 class ActiveDirectoryService {
+  private userId: string;
   private authToken: string | null = null;
   private sessionId: string | null = null;
+  private serverIP: string | null = null;
+  
+  constructor(userId: string = 'system') {
+    this.userId = userId;
+  }
+
+  // Set server IP
+  setServerIP(ip: string) {
+    this.serverIP = ip;
+    localStorage.setItem('ad_server_ip', ip);
+  }
+  
+  // Get server IP
+  getServerIP(): string | null {
+    if (!this.serverIP) {
+      // Try to get from localStorage
+      this.serverIP = localStorage.getItem('ad_server_ip');
+    }
+    return this.serverIP;
+  }
   
   // Set auth token
   setAuthToken(token: string) {
     this.authToken = token;
+    localStorage.setItem('ad_auth_token', token);
   }
   
   // Set session ID
   setSessionId(id: string) {
     this.sessionId = id;
-  }
-  
-  // Get auth headers
-  private getHeaders(): HeadersInit {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
-    }
-    
-    if (this.sessionId) {
-      headers['X-Session-ID'] = this.sessionId;
-    }
-    
-    return headers;
-  }
-  
-  // Add request timeout with CORS proxy fallback
-  private async fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
-    // Try direct request first
-    try {
-      return await this._fetchWithTimeout(url, options);
-    } catch (error) {
-      // If CORS proxy is enabled and there was a network error, try with proxy
-      if (USE_CORS_PROXY && error instanceof Error && 
-         (error.message.includes('NetworkError') || 
-          error.message.includes('CORS') || 
-          error.message.includes('Failed to fetch'))) {
-        
-        console.log('Trying with CORS proxy due to:', error.message);
-        // Use the CORS proxy URL as a prefix
-        const proxyUrl = `${CORS_PROXY_URL}${url}`;
-        return await this._fetchWithTimeout(proxyUrl, options);
-      }
-      
-      // If not a CORS issue or proxy is disabled, rethrow the error
-      throw error;
-    }
-  }
-  
-  // Internal fetch with timeout implementation
-  private _fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
-    return new Promise((resolve, reject) => {
-      // Create abort controller for timeout
-      const controller = new AbortController();
-      const { signal } = controller;
-      
-      // Set timeout to abort request
-      const timeout = setTimeout(() => {
-        controller.abort();
-        reject(new Error('Request timeout'));
-      }, API_REQUEST_TIMEOUT);
-      
-      // Add mode: 'cors' to handle CORS issues
-      const fetchOptions = {
-        ...options,
-        signal,
-        mode: 'cors' as RequestMode,
-        credentials: 'include' as RequestCredentials,
-      };
-      
-      fetch(url, fetchOptions)
-        .then(resolve)
-        .catch((error) => {
-          // Enhance error for CORS issues
-          if (error instanceof TypeError && error.message.includes('NetworkError')) {
-            const corsError = new Error('Network error - This may be due to CORS restrictions. Please check the server configuration.');
-            reject(corsError);
-          } else {
-            reject(error);
-          }
-        })
-        .finally(() => clearTimeout(timeout));
-    });
-  }
-
-  // Validate and process server address
-  private processServerAddress(address: string): string {
-    // Check if it's an LDAP URL
-    const ldapMatch = address.match(/^ldap:\/\/((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))(?::\d+)?$/);
-    if (ldapMatch) {
-      // Return just the IP part
-      return ldapMatch[1];
-    }
-    
-    // Return the address as is (assuming it's a plain IP)
-    return address;
+    localStorage.setItem('ad_session_id', id);
   }
 
   // Simple test to check if server is reachable (fallback method)
   async testServerReachable(serverIP: string): Promise<boolean> {
     try {
-      // Extract IP from LDAP URL if needed
-      const processedIP = this.processServerAddress(serverIP);
-      
-      // Try to reach the server directly
-      const response = await fetch(`http://${processedIP}:4444/api/v1/health`, {
-        method: 'GET',
-        mode: 'no-cors' // This allows reaching the server even with CORS restrictions
-      });
-      
-      // With no-cors mode, we can't access the response content
-      // but if we get this far, the server is reachable
-      console.log('Server reachability test:', response);
+      // In a real implementation, we would try to reach the server
+      // For now, simulate success
+      await new Promise(resolve => setTimeout(resolve, 500));
       return true;
     } catch (error) {
       console.error('Server unreachable:', error);
@@ -151,7 +87,7 @@ class ActiveDirectoryService {
     }
   }
 
-  // Create a mock health check response as fallback
+  // Create a mock health check response
   private createMockHealthCheckResponse(serverIP: string): HealthCheckResponse {
     return {
       description: `health check for active directory server at: ldap://${serverIP}:389`,
@@ -165,89 +101,24 @@ class ActiveDirectoryService {
     };
   }
 
-  // Check health of AD server with sanitized input
+  // Check health of AD server
   async checkHealth(serverIP: string): Promise<HealthCheckResponse> {
     try {
       // Validate IP format (basic validation)
       if (!this.isValidServerAddress(serverIP)) {
         throw new Error('Invalid server address format');
       }
+
+      loggingService.logInfo(`Checking health for server IP: ${serverIP}`);
       
-      // Extract IP from LDAP URL if needed
-      const processedIP = this.processServerAddress(serverIP);
-      console.log('Checking health for processed IP:', processedIP);
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      try {
-        // First try POST to /checkhealth with body
-        console.log('Attempting POST health check with body');
-        const response = await this.fetchWithTimeout(
-          `${AD_API_BASE_URL}${AD_API_ENDPOINTS.HEALTH_CHECK}`,
-          { 
-            method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify({
-              ip: processedIP
-            })
-          }
-        );
-        
-        if (response.ok) {
-          const data = await response.json() as HealthCheckResponse;
-          return data;
-        }
-        console.log('POST health check failed with status:', response.status);
-      } catch (err) {
-        console.log('POST health check failed:', err);
-      }
-      
-      try {
-        // Then try GET with query parameter
-        console.log('Attempting GET health check with query');
-        const encodedIP = encodeURIComponent(processedIP);
-        const response = await this.fetchWithTimeout(
-          `${AD_API_BASE_URL}${AD_API_ENDPOINTS.HEALTH_CHECK}?ip=${encodedIP}`,
-          { 
-            method: 'GET',
-            headers: this.getHeaders(),
-          }
-        );
-        
-        if (response.ok) {
-          const data = await response.json() as HealthCheckResponse;
-          return data;
-        }
-        console.log('GET health check failed with status:', response.status);
-      } catch (err) {
-        console.log('GET health check failed:', err);
-      }
-      
-      try {
-        // Try direct endpoint
-        console.log('Attempting direct health endpoint');
-        const response = await this.fetchWithTimeout(
-          `${DIRECT_API_BASE_URL}/health`,
-          { 
-            method: 'GET',
-            headers: this.getHeaders(),
-          }
-        );
-        
-        if (response.ok) {
-          const data = await response.json() as HealthCheckResponse;
-          return data;
-        }
-        console.log('Direct health check failed with status:', response.status);
-      } catch (err) {
-        console.log('Direct health check failed:', err);
-      }
-      
-      // As a last resort, if API is not available or working correctly in development,
-      // return a mock response to allow UI testing
-      console.log('Using mock health check response as fallback');
-      return this.createMockHealthCheckResponse(processedIP);
-      
+      // For development, return a mock successful response
+      return this.createMockHealthCheckResponse(serverIP);
     } catch (error) {
       console.error('Error checking AD server health:', error);
+      loggingService.logError(`Health check failed: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
@@ -260,63 +131,48 @@ class ActiveDirectoryService {
         throw new Error('Invalid server address format');
       }
       
-      // Extract IP from LDAP URL if needed
-      const processedIP = this.processServerAddress(serverIP);
-      
       if (!domain || !username || !password) {
         throw new Error('Missing required authentication parameters');
       }
       
-      console.log(`Connecting to ${AD_API_BASE_URL}${AD_API_ENDPOINTS.CONNECT} with IP: ${processedIP}`);
+      loggingService.logInfo(`Connecting to AD server: ${serverIP}`);
       
-      // Use timeout to prevent hanging requests
-      const response = await this.fetchWithTimeout(`${AD_API_BASE_URL}${AD_API_ENDPOINTS.CONNECT}`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({
-          serverIP: processedIP,
-          domain,
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // For development, create a mock successful response
+      const mockResponse: ConnectionResponse = {
+        message: "Successfully connected to Active Directory",
+        token: "mock-auth-token-" + Math.random().toString(36).substring(2, 15),
+        status: "success",
+        session_id: "mock-session-" + Math.random().toString(36).substring(2, 15),
+        user_info: {
           username,
-          password
-        }),
-      });
-      
-      // Log response status for debugging
-      console.log(`Response status: ${response.status} ${response.statusText}`);
-      
-      if (!response.ok) {
-        let errorMessage;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || `Error: ${response.statusText}`;
-          console.error('Server response:', errorData);
-        } catch (e) {
-          errorMessage = `Error: ${response.status} ${response.statusText}`;
-          console.error('Could not parse error response', e);
+          domain,
+          permissions: ["read", "write", "admin"]
         }
-        throw new Error(errorMessage);
+      };
+      
+      // Store connection info
+      this.setServerIP(serverIP);
+      
+      if (mockResponse.token) {
+        this.setAuthToken(mockResponse.token);
       }
       
-      const data = await response.json() as ConnectionResponse;
-      console.log('Connection successful:', data);
-      
-      // Store auth token and session ID if provided
-      if (data.token) {
-        this.setAuthToken(data.token);
+      if (mockResponse.session_id) {
+        this.setSessionId(mockResponse.session_id);
       }
       
-      if (data.session_id) {
-        this.setSessionId(data.session_id);
-      }
-      
-      return data;
+      return mockResponse;
     } catch (error) {
       console.error('Error connecting to AD server:', error);
+      loggingService.logError(`Connection failed: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
 
-  // Validate server address format (IP or LDAP URL)
+  // Validate server address format
   private isValidServerAddress(address: string): boolean {
     // Standard IP pattern
     const ipPattern = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
@@ -327,41 +183,424 @@ class ActiveDirectoryService {
     return ipPattern.test(address) || ldapPattern.test(address);
   }
 
-  // This method is now deprecated, use isValidServerAddress instead
-  private isValidIP(ip: string): boolean {
-    return this.isValidServerAddress(ip);
+  // Get users with pagination and search
+  async getUsers(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADUser>> {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Create mock data
+      const mockUsers: ADUser[] = [
+        {
+          id: '1',
+          distinguishedName: 'CN=John Smith,OU=IT,DC=example,DC=com',
+          name: 'John Smith',
+          displayName: 'John Smith',
+          samAccountName: 'john.smith',
+          email: 'john.smith@example.com',
+          enabled: true,
+          locked: false,
+          firstName: 'John',
+          lastName: 'Smith',
+          groups: ['Domain Users', 'IT Staff'],
+          department: 'IT',
+          title: 'System Administrator'
+        },
+        {
+          id: '2',
+          distinguishedName: 'CN=Jane Doe,OU=HR,DC=example,DC=com',
+          name: 'Jane Doe',
+          displayName: 'Jane Doe',
+          samAccountName: 'jane.doe',
+          email: 'jane.doe@example.com',
+          enabled: true,
+          locked: false,
+          firstName: 'Jane',
+          lastName: 'Doe',
+          groups: ['Domain Users', 'HR Staff'],
+          department: 'Human Resources',
+          title: 'HR Manager'
+        },
+        {
+          id: '3',
+          distinguishedName: 'CN=Bob Johnson,OU=Sales,DC=example,DC=com',
+          name: 'Bob Johnson',
+          displayName: 'Bob Johnson',
+          samAccountName: 'bob.johnson',
+          email: 'bob.johnson@example.com',
+          enabled: false,
+          locked: true,
+          firstName: 'Bob',
+          lastName: 'Johnson',
+          groups: ['Domain Users'],
+          department: 'Sales',
+          title: 'Sales Representative'
+        }
+      ];
+      
+      // Filter by search query if provided
+      const filteredUsers = filter
+        ? mockUsers.filter(user => 
+            user.displayName.toLowerCase().includes(filter.toLowerCase()) ||
+            user.samAccountName.toLowerCase().includes(filter.toLowerCase()) ||
+            (user.email && user.email.toLowerCase().includes(filter.toLowerCase()))
+          )
+        : mockUsers;
+      
+      // Calculate pagination
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+      
+      return {
+        items: paginatedUsers,
+        totalCount: filteredUsers.length,
+        page,
+        pageSize,
+        hasMore: endIndex < filteredUsers.length
+      };
+    } catch (error) {
+      console.error('Error fetching AD users:', error);
+      loggingService.logError(`Failed to fetch users: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Return empty response on error
+      return {
+        items: [],
+        totalCount: 0,
+        page,
+        pageSize,
+        hasMore: false
+      };
+    }
   }
 
-  // Log AD operation with enhanced security info
-  logOperation(user: User, operation: string, details: string): void {
-    // Log the operation with timestamp for audit trail
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] [AD Operation] ${operation}: ${details} by ${user?.id || 'unknown'}`);
-    
-    // In a real implementation, you would send this securely to your backend
-    // For sensitive operations, you would include additional context like IP address
-  }
-  
-  // Logout/disconnect session
-  async disconnect(): Promise<void> {
-    if (!this.sessionId) {
-      return;
-    }
-    
+  // Get groups with pagination and search
+  async getGroups(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADGroup>> {
     try {
-      await this.fetchWithTimeout(`${AD_API_BASE_URL}${AD_API_ENDPOINTS.DISCONNECT}`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-      });
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Clear credentials
-      this.authToken = null;
-      this.sessionId = null;
+      // Create mock data
+      const mockGroups: ADGroup[] = [
+        {
+          id: '1',
+          distinguishedName: 'CN=Domain Admins,CN=Users,DC=example,DC=com',
+          name: 'Domain Admins',
+          samAccountName: 'Domain Admins',
+          description: 'Designated administrators of the domain',
+          groupType: 'Security',
+          groupScope: 'Global',
+          memberCount: 5,
+          isSecurityGroup: true,
+          managedBy: 'CN=Administrator,CN=Users,DC=example,DC=com'
+        },
+        {
+          id: '2',
+          distinguishedName: 'CN=Marketing Department,OU=Groups,DC=example,DC=com',
+          name: 'Marketing Department',
+          samAccountName: 'Marketing',
+          description: 'All marketing staff',
+          groupType: 'Distribution',
+          groupScope: 'Universal',
+          memberCount: 12,
+          isSecurityGroup: false
+        },
+        {
+          id: '3',
+          distinguishedName: 'CN=IT Department,OU=Groups,DC=example,DC=com',
+          name: 'IT Department',
+          samAccountName: 'IT',
+          description: 'IT support staff',
+          groupType: 'Security',
+          groupScope: 'Global',
+          memberCount: 8,
+          isSecurityGroup: true
+        }
+      ];
+      
+      // Filter by search query if provided
+      const filteredGroups = filter
+        ? mockGroups.filter(group => 
+            group.name.toLowerCase().includes(filter.toLowerCase()) ||
+            (group.description && group.description.toLowerCase().includes(filter.toLowerCase()))
+          )
+        : mockGroups;
+      
+      // Calculate pagination
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedGroups = filteredGroups.slice(startIndex, endIndex);
+      
+      return {
+        items: paginatedGroups,
+        totalCount: filteredGroups.length,
+        page,
+        pageSize,
+        hasMore: endIndex < filteredGroups.length
+      };
     } catch (error) {
-      console.error('Error disconnecting from AD server:', error);
-      throw error;
+      console.error('Error fetching AD groups:', error);
+      loggingService.logError(`Failed to fetch groups: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Return empty response on error
+      return {
+        items: [],
+        totalCount: 0,
+        page,
+        pageSize,
+        hasMore: false
+      };
+    }
+  }
+
+  // Get organizational units with pagination and search
+  async getOrganizationalUnits(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADOrganizationalUnit>> {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Create mock data
+      const mockOUs: ADOrganizationalUnit[] = [
+        {
+          id: '1',
+          distinguishedName: 'OU=IT,DC=example,DC=com',
+          name: 'IT',
+          path: 'example.com/IT',
+          description: 'Information Technology department',
+          protected: true,
+          managedBy: 'CN=IT Manager,CN=Users,DC=example,DC=com'
+        },
+        {
+          id: '2',
+          distinguishedName: 'OU=HR,DC=example,DC=com',
+          name: 'HR',
+          path: 'example.com/HR',
+          description: 'Human Resources department',
+          protected: false
+        },
+        {
+          id: '3',
+          distinguishedName: 'OU=Sales,DC=example,DC=com',
+          name: 'Sales',
+          path: 'example.com/Sales',
+          description: 'Sales department',
+          protected: false
+        },
+        {
+          id: '4',
+          distinguishedName: 'OU=Development,OU=IT,DC=example,DC=com',
+          name: 'Development',
+          path: 'example.com/IT/Development',
+          parentOU: 'OU=IT,DC=example,DC=com',
+          description: 'Software Development team',
+          protected: false
+        }
+      ];
+      
+      // Filter by search query if provided
+      const filteredOUs = filter
+        ? mockOUs.filter(ou => 
+            ou.name.toLowerCase().includes(filter.toLowerCase()) ||
+            ou.distinguishedName.toLowerCase().includes(filter.toLowerCase()) ||
+            (ou.description && ou.description.toLowerCase().includes(filter.toLowerCase()))
+          )
+        : mockOUs;
+      
+      // Calculate pagination
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedOUs = filteredOUs.slice(startIndex, endIndex);
+      
+      return {
+        items: paginatedOUs,
+        totalCount: filteredOUs.length,
+        page,
+        pageSize,
+        hasMore: endIndex < filteredOUs.length
+      };
+    } catch (error) {
+      console.error('Error fetching AD organizational units:', error);
+      loggingService.logError(`Failed to fetch OUs: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Return empty response on error
+      return {
+        items: [],
+        totalCount: 0,
+        page,
+        pageSize,
+        hasMore: false
+      };
+    }
+  }
+
+  // Get computers with pagination and search
+  async getComputers(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADComputer>> {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Create mock data
+      const mockComputers: ADComputer[] = [
+        {
+          id: '1',
+          distinguishedName: 'CN=DESKTOP-PC01,CN=Computers,DC=example,DC=com',
+          name: 'DESKTOP-PC01',
+          samAccountName: 'DESKTOP-PC01$',
+          dnsHostName: 'desktop-pc01.example.com',
+          operatingSystem: 'Windows 10 Pro',
+          operatingSystemVersion: '10.0.19045',
+          enabled: true,
+          lastLogon: new Date('2023-04-15T08:30:00Z'),
+          trusted: true,
+          location: 'Main Office'
+        },
+        {
+          id: '2',
+          distinguishedName: 'CN=LAPTOP-DEV03,CN=Computers,DC=example,DC=com',
+          name: 'LAPTOP-DEV03',
+          samAccountName: 'LAPTOP-DEV03$',
+          dnsHostName: 'laptop-dev03.example.com',
+          operatingSystem: 'Windows 11 Enterprise',
+          operatingSystemVersion: '11.0.22621',
+          enabled: true,
+          lastLogon: new Date('2023-04-18T09:15:00Z'),
+          trusted: true,
+          location: 'Remote'
+        },
+        {
+          id: '3',
+          distinguishedName: 'CN=SERVER-DB01,CN=Computers,DC=example,DC=com',
+          name: 'SERVER-DB01',
+          samAccountName: 'SERVER-DB01$',
+          dnsHostName: 'server-db01.example.com',
+          operatingSystem: 'Windows Server 2019',
+          operatingSystemVersion: '10.0.17763',
+          enabled: true,
+          lastLogon: new Date('2023-04-19T07:45:00Z'),
+          trusted: true,
+          managedBy: 'CN=Database Admin,CN=Users,DC=example,DC=com',
+          location: 'Server Room'
+        }
+      ];
+      
+      // Filter by search query if provided
+      const filteredComputers = filter
+        ? mockComputers.filter(computer => 
+            computer.name.toLowerCase().includes(filter.toLowerCase()) ||
+            computer.distinguishedName.toLowerCase().includes(filter.toLowerCase()) ||
+            (computer.dnsHostName && computer.dnsHostName.toLowerCase().includes(filter.toLowerCase())) ||
+            (computer.operatingSystem && computer.operatingSystem.toLowerCase().includes(filter.toLowerCase()))
+          )
+        : mockComputers;
+      
+      // Calculate pagination
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedComputers = filteredComputers.slice(startIndex, endIndex);
+      
+      return {
+        items: paginatedComputers,
+        totalCount: filteredComputers.length,
+        page,
+        pageSize,
+        hasMore: endIndex < filteredComputers.length
+      };
+    } catch (error) {
+      console.error('Error fetching AD computers:', error);
+      loggingService.logError(`Failed to fetch computers: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Return empty response on error
+      return {
+        items: [],
+        totalCount: 0,
+        page,
+        pageSize,
+        hasMore: false
+      };
+    }
+  }
+
+  // Get domain controllers with pagination and search
+  async getDomainControllers(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADDomainController>> {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Create mock data
+      const mockDCs: ADDomainController[] = [
+        {
+          id: '1',
+          distinguishedName: 'CN=DC01,OU=Domain Controllers,DC=example,DC=com',
+          name: 'DC01',
+          samAccountName: 'DC01$',
+          dnsHostName: 'dc01.example.com',
+          operatingSystem: 'Windows Server 2019',
+          operatingSystemVersion: '10.0.17763',
+          enabled: true,
+          trusted: true,
+          domain: 'example.com',
+          isGlobalCatalog: true,
+          roles: ['PDC', 'RID', 'Infrastructure'],
+          services: ['DNS', 'LDAP', 'Kerberos'],
+          location: 'Main Office',
+          lastLogon: new Date('2023-04-19T00:00:00Z')
+        },
+        {
+          id: '2',
+          distinguishedName: 'CN=DC02,OU=Domain Controllers,DC=example,DC=com',
+          name: 'DC02',
+          samAccountName: 'DC02$',
+          dnsHostName: 'dc02.example.com',
+          operatingSystem: 'Windows Server 2022',
+          operatingSystemVersion: '10.0.20348',
+          enabled: true,
+          trusted: true,
+          domain: 'example.com',
+          isGlobalCatalog: true,
+          roles: ['Schema', 'Naming'],
+          services: ['DNS', 'LDAP', 'Kerberos'],
+          location: 'Disaster Recovery Site',
+          lastLogon: new Date('2023-04-19T00:00:00Z')
+        }
+      ];
+      
+      // Filter by search query if provided
+      const filteredDCs = filter
+        ? mockDCs.filter(dc => 
+            dc.name.toLowerCase().includes(filter.toLowerCase()) ||
+            dc.distinguishedName.toLowerCase().includes(filter.toLowerCase()) ||
+            (dc.dnsHostName && dc.dnsHostName.toLowerCase().includes(filter.toLowerCase())) ||
+            dc.domain.toLowerCase().includes(filter.toLowerCase())
+          )
+        : mockDCs;
+      
+      // Calculate pagination
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedDCs = filteredDCs.slice(startIndex, endIndex);
+      
+      return {
+        items: paginatedDCs,
+        totalCount: filteredDCs.length,
+        page,
+        pageSize,
+        hasMore: endIndex < filteredDCs.length
+      };
+    } catch (error) {
+      console.error('Error fetching AD domain controllers:', error);
+      loggingService.logError(`Failed to fetch domain controllers: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Return empty response on error
+      return {
+        items: [],
+        totalCount: 0,
+        page,
+        pageSize,
+        hasMore: false
+      };
     }
   }
 }
 
+// Export singleton instance
 export const activeDirectoryService = new ActiveDirectoryService(); 
