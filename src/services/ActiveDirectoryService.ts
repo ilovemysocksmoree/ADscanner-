@@ -330,7 +330,7 @@ export class ActiveDirectoryService {
   }
 
   // Helper method to convert Windows file time to JavaScript Date
-  private windowsTimeToDate(windowsTime: string | number): Date | undefined {
+  public windowsTimeToDate(windowsTime: string | number): Date | undefined {
     try {
       // Windows file time is in 100-nanosecond intervals since January 1, 1601 UTC
       // JavaScript time is in milliseconds since January 1, 1970 UTC

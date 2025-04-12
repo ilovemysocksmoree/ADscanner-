@@ -31,6 +31,7 @@ export interface ADUser extends ADEntity {
   department?: string;
   title?: string;
   company?: string;
+  rawAttributes?: Record<string, any>; // Raw AD attributes from the API response
 }
 
 // Group entity

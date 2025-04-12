@@ -62,6 +62,13 @@ import { activeDirectoryService } from '../../../services/ActiveDirectoryService
 import { loggingService } from '../../../services/LoggingService';
 import { ADUser } from '../../../models/ad-entities';
 
+// Extended ADUser interface with UI state properties
+interface ADUserWithUIState extends ADUser {
+  isLoading?: boolean;
+  hasError?: boolean;
+  errorMessage?: string;
+}
+
 const UsersTab: React.FC = () => {
   // State
   const [users, setUsers] = useState<ADUser[]>([]);
@@ -71,7 +78,7 @@ const UsersTab: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalUsers, setTotalUsers] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedUser, setSelectedUser] = useState<ADUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ADUserWithUIState | null>(null);
   const [userDetailOpen, setUserDetailOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'active', 'disabled', 'locked'
 
@@ -176,6 +183,8 @@ const UsersTab: React.FC = () => {
   const handleViewDetails = (user: ADUser) => {
     setSelectedUser(user);
     setUserDetailOpen(true);
+    // Fetch detailed user information
+    fetchUserDetails(user.distinguishedName);
   };
 
   const handleCloseDetails = () => {
@@ -281,6 +290,88 @@ const UsersTab: React.FC = () => {
       return user.displayName[0].toUpperCase();
     }
     return user.samAccountName[0].toUpperCase();
+  };
+
+  // New function to fetch detailed user information
+  const fetchUserDetails = async (distinguishedName: string) => {
+    try {
+      // Set a loading state for the dialog
+      setSelectedUser(prev => prev ? { ...prev, isLoading: true } as ADUserWithUIState : null);
+      
+      const url = 'http://192.168.1.5:4444/api/v1/ad/object/users';
+      const serverIP = '192.168.1.8';
+      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
+      
+      const body = {
+        address: `ldap://${serverIP}:389`,
+        domain_name: domain,
+        dn: distinguishedName
+      };
+      
+      console.log('Fetching user details for:', distinguishedName);
+      console.log('Request body:', JSON.stringify(body));
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('User details response:', data);
+      
+      if (data.status === "success" && data.users && data.users.length > 0) {
+        // Get the first user from the response (should be just one)
+        const userDetails = data.users[0];
+        
+        // Transform the raw user details to our ADUser format
+        const detailedUser: ADUserWithUIState = {
+          id: userDetails.objectGUID || distinguishedName,
+          distinguishedName: userDetails.distinguishedName,
+          name: userDetails.displayName || userDetails.samAccountName,
+          displayName: userDetails.displayName || userDetails.samAccountName,
+          samAccountName: userDetails.samAccountName,
+          userPrincipalName: userDetails.userPrincipalName || '',
+          firstName: userDetails.givenName || '',
+          lastName: userDetails.surName || '',
+          email: userDetails.mail || '',
+          enabled: !(userDetails.userAccountControl & 2), // Check disabled bit
+          locked: !!(userDetails.userAccountControl & 16), // Check locked bit
+          description: userDetails.description || '',
+          title: userDetails.title || '',
+          department: userDetails.department || '',
+          phoneNumber: userDetails.telephoneNumber || userDetails.mobile || '',
+          company: userDetails.company || '',
+          manager: userDetails.manager || '',
+          groups: userDetails.memberof || [],
+          created: userDetails.whenCreated ? new Date(userDetails.whenCreated) : undefined,
+          modified: userDetails.whenChanged ? new Date(userDetails.whenChanged) : undefined,
+          lastLogon: userDetails.lastLogon ? activeDirectoryService.windowsTimeToDate(userDetails.lastLogon) : undefined,
+          passwordExpired: !!(userDetails.userAccountControl & 8388608), // Check password expired bit
+          // Add all raw attributes for display
+          rawAttributes: userDetails.rawAttributes || userDetails
+        };
+        
+        // Update the selected user with detailed information
+        setSelectedUser(detailedUser);
+      } else {
+        throw new Error(data.message || 'Failed to retrieve user details');
+      }
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      loggingService.logError(`Failed to fetch user details: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Update selected user with error info
+      setSelectedUser(prev => prev ? { 
+        ...prev, 
+        hasError: true, 
+        errorMessage: error instanceof Error ? error.message : String(error) 
+      } as ADUserWithUIState : null);
+    }
   };
 
   return (
@@ -557,208 +648,276 @@ const UsersTab: React.FC = () => {
                 >
                   {getAvatarContent(selectedUser)}
                 </Avatar>
-                <Box>
+                <Box sx={{ flexGrow: 1 }}>
                   <Typography variant="h6">{selectedUser.displayName}</Typography>
                   <Typography variant="body2" color="textSecondary">
                     {selectedUser.distinguishedName}
                   </Typography>
                 </Box>
+                {selectedUser.isLoading && (
+                  <CircularProgress size={24} sx={{ ml: 2 }} />
+                )}
               </Box>
             </DialogTitle>
             <DialogContent dividers>
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <Card variant="outlined">
-                    <CardHeader 
-                      title="Basic Information" 
-                      titleTypographyProps={{ variant: 'subtitle1' }}
-                      avatar={<Person color="primary" />}
-                    />
-                    <Divider />
-                    <CardContent>
-                      <List dense>
-                        <ListItem>
-                          <ListItemIcon>
-                            <Person fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Full Name" 
-                            secondary={`${selectedUser.firstName || ''} ${selectedUser.lastName || ''}`.trim() || 'N/A'} 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemIcon>
-                            <VerifiedUser fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Username" 
-                            secondary={selectedUser.samAccountName} 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemIcon>
-                            <Email fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Email" 
-                            secondary={selectedUser.email || 'N/A'} 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemIcon>
-                            <Phone fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Phone" 
-                            secondary={selectedUser.phoneNumber || 'N/A'} 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemIcon>
-                            <Work fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Department" 
-                            secondary={selectedUser.department || 'N/A'} 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemIcon>
-                            <BusinessCenter fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Title" 
-                            secondary={selectedUser.title || 'N/A'} 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemIcon>
-                            <BusinessCenter fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Company" 
-                            secondary={selectedUser.company || 'N/A'} 
-                          />
-                        </ListItem>
-                      </List>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Card variant="outlined">
-                    <CardHeader 
-                      title="Account Status" 
-                      titleTypographyProps={{ variant: 'subtitle1' }}
-                      avatar={selectedUser.enabled ? <LockOpen color="success" /> : <Lock color="error" />}
-                    />
-                    <Divider />
-                    <CardContent>
-                      <List dense>
-                        <ListItem>
-                          <ListItemIcon>
-                            {selectedUser.enabled ? <LockOpen color="success" /> : <Lock color="error" />}
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Account Status" 
-                            secondary={
-                              selectedUser.locked
-                                ? 'Locked'
-                                : selectedUser.enabled
-                                  ? 'Enabled'
-                                  : 'Disabled'
-                            }
-                          />
-                        </ListItem>
-                        {selectedUser.passwordExpired && (
-                          <ListItem>
-                            <ListItemIcon>
-                              <Lock color="error" />
-                            </ListItemIcon>
-                            <ListItemText 
-                              primary="Password Status" 
-                              secondary="Password Expired" 
-                            />
-                          </ListItem>
-                        )}
-                        <ListItem>
-                          <ListItemIcon>
-                            <Event fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Created" 
-                            secondary={selectedUser.created ? formatDate(selectedUser.created) : 'N/A'} 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemIcon>
-                            <Event fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Modified" 
-                            secondary={selectedUser.modified ? formatDate(selectedUser.modified) : 'N/A'} 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemIcon>
-                            <Schedule fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary="Last Logon" 
-                            secondary={selectedUser.lastLogon ? formatDate(selectedUser.lastLogon) : 'Never'} 
-                          />
-                        </ListItem>
-                      </List>
-                    </CardContent>
-                  </Card>
-                  <Box sx={{ mt: 2 }}>
-                    <Card variant="outlined">
-                      <CardHeader 
-                        title="Group Memberships" 
-                        titleTypographyProps={{ variant: 'subtitle1' }}
-                        avatar={<Group color="primary" />}
-                      />
-                      <Divider />
-                      <CardContent sx={{ maxHeight: 200, overflow: 'auto' }}>
-                        {selectedUser.groups && selectedUser.groups.length > 0 ? (
+              {selectedUser.isLoading ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+                  <CircularProgress size={40} sx={{ mb: 2 }} />
+                  <Typography variant="body1">Loading user details...</Typography>
+                </Box>
+              ) : selectedUser.hasError ? (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="h6" color="error" gutterBottom>
+                    Error Loading User Details
+                  </Typography>
+                  <Typography variant="body1">
+                    {selectedUser.errorMessage || 'An unknown error occurred'}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    sx={{ mt: 2 }}
+                    onClick={() => fetchUserDetails(selectedUser.distinguishedName)}
+                  >
+                    Retry
+                  </Button>
+                </Box>
+              ) : (
+                <>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined">
+                        <CardHeader 
+                          title="Basic Information" 
+                          titleTypographyProps={{ variant: 'subtitle1' }}
+                          avatar={<Person color="primary" />}
+                        />
+                        <Divider />
+                        <CardContent>
                           <List dense>
-                            {selectedUser.groups.map((group, index) => {
-                              // Extract the CN part from the distinguished name
-                              const groupName = group.match(/CN=([^,]*)/)?.[1] || group;
-                              return (
-                                <ListItem key={index}>
-                                  <ListItemIcon>
-                                    <Group fontSize="small" />
-                                  </ListItemIcon>
-                                  <ListItemText 
-                                    primary={groupName}
-                                    secondary={group}
-                                  />
-                                </ListItem>
-                              );
-                            })}
+                            <ListItem>
+                              <ListItemIcon>
+                                <Person fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Full Name" 
+                                secondary={`${selectedUser.firstName || ''} ${selectedUser.lastName || ''}`.trim() || 'N/A'} 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemIcon>
+                                <VerifiedUser fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Username" 
+                                secondary={selectedUser.samAccountName} 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemIcon>
+                                <Email fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Email" 
+                                secondary={selectedUser.email || 'N/A'} 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemIcon>
+                                <Phone fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Phone" 
+                                secondary={selectedUser.phoneNumber || 'N/A'} 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemIcon>
+                                <Work fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Department" 
+                                secondary={selectedUser.department || 'N/A'} 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemIcon>
+                                <BusinessCenter fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Title" 
+                                secondary={selectedUser.title || 'N/A'} 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemIcon>
+                                <BusinessCenter fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Company" 
+                                secondary={selectedUser.company || 'N/A'} 
+                              />
+                            </ListItem>
                           </List>
-                        ) : (
-                          <Typography variant="body2" color="textSecondary">
-                            No group memberships found
-                          </Typography>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Box>
-                </Grid>
-              </Grid>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined">
+                        <CardHeader 
+                          title="Account Status" 
+                          titleTypographyProps={{ variant: 'subtitle1' }}
+                          avatar={selectedUser.enabled ? <LockOpen color="success" /> : <Lock color="error" />}
+                        />
+                        <Divider />
+                        <CardContent>
+                          <List dense>
+                            <ListItem>
+                              <ListItemIcon>
+                                {selectedUser.enabled ? <LockOpen color="success" /> : <Lock color="error" />}
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Account Status" 
+                                secondary={
+                                  selectedUser.locked
+                                    ? 'Locked'
+                                    : selectedUser.enabled
+                                      ? 'Enabled'
+                                      : 'Disabled'
+                                }
+                              />
+                            </ListItem>
+                            {selectedUser.passwordExpired && (
+                              <ListItem>
+                                <ListItemIcon>
+                                  <Lock color="error" />
+                                </ListItemIcon>
+                                <ListItemText 
+                                  primary="Password Status" 
+                                  secondary="Password Expired" 
+                                />
+                              </ListItem>
+                            )}
+                            <ListItem>
+                              <ListItemIcon>
+                                <Event fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Created" 
+                                secondary={selectedUser.created ? formatDate(selectedUser.created) : 'N/A'} 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemIcon>
+                                <Event fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Modified" 
+                                secondary={selectedUser.modified ? formatDate(selectedUser.modified) : 'N/A'} 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemIcon>
+                                <Schedule fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary="Last Logon" 
+                                secondary={selectedUser.lastLogon ? formatDate(selectedUser.lastLogon) : 'Never'} 
+                              />
+                            </ListItem>
+                          </List>
+                        </CardContent>
+                      </Card>
+                      <Box sx={{ mt: 2 }}>
+                        <Card variant="outlined">
+                          <CardHeader 
+                            title="Group Memberships" 
+                            titleTypographyProps={{ variant: 'subtitle1' }}
+                            avatar={<Group color="primary" />}
+                          />
+                          <Divider />
+                          <CardContent sx={{ maxHeight: 200, overflow: 'auto' }}>
+                            {selectedUser.groups && selectedUser.groups.length > 0 ? (
+                              <List dense>
+                                {selectedUser.groups.map((group, index) => {
+                                  // Extract the CN part from the distinguished name
+                                  const groupName = group.match(/CN=([^,]*)/)?.[1] || group;
+                                  return (
+                                    <ListItem key={index}>
+                                      <ListItemIcon>
+                                        <Group fontSize="small" />
+                                      </ListItemIcon>
+                                      <ListItemText 
+                                        primary={groupName}
+                                        secondary={group}
+                                      />
+                                    </ListItem>
+                                  );
+                                })}
+                              </List>
+                            ) : (
+                              <Typography variant="body2" color="textSecondary">
+                                No group memberships found
+                              </Typography>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                  
+                  {/* Display raw attributes if available */}
+                  {selectedUser.rawAttributes && (
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="subtitle1" gutterBottom>
+                        Raw Active Directory Attributes
+                      </Typography>
+                      <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflow: 'auto' }}>
+                        {Object.entries(selectedUser.rawAttributes).map(([key, values]) => (
+                          <Box key={key} sx={{ mb: 2 }}>
+                            <Typography variant="subtitle2" color="primary" gutterBottom>
+                              {key}
+                            </Typography>
+                            {Array.isArray(values) ? (
+                              <List dense>
+                                {values.map((value, index) => (
+                                  <ListItem key={index} sx={{ py: 0.5 }}>
+                                    <ListItemText
+                                      primary={
+                                        <Typography variant="body2" component="div" sx={{ wordBreak: 'break-all' }}>
+                                          {String(value)}
+                                        </Typography>
+                                      }
+                                    />
+                                  </ListItem>
+                                ))}
+                              </List>
+                            ) : (
+                              <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                {String(values)}
+                              </Typography>
+                            )}
+                          </Box>
+                        ))}
+                      </Paper>
+                    </Box>
+                  )}
+                </>
+              )}
             </DialogContent>
             <DialogActions>
               <Button onClick={handleCloseDetails}>Close</Button>
-              <Button 
-                color="primary" 
-                onClick={() => {
-                  // Edit logic
-                  handleCloseDetails();
-                }}
-              >
-                Edit User
-              </Button>
+              {!selectedUser.isLoading && !selectedUser.hasError && (
+                <Button 
+                  color="primary" 
+                  onClick={() => {
+                    // Edit logic
+                    handleCloseDetails();
+                  }}
+                >
+                  Edit User
+                </Button>
+              )}
             </DialogActions>
           </>
         )}
