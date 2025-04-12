@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -22,7 +22,12 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  Collapse
+  Collapse,
+  Avatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   Search,
@@ -34,7 +39,8 @@ import {
   ExpandMore,
   ChevronRight,
   Folder,
-  FolderOpen
+  FolderOpen,
+  Info
 } from '@mui/icons-material';
 import { activeDirectoryService } from '../../../services/ActiveDirectoryService';
 import { loggingService } from '../../../services/LoggingService';
@@ -44,23 +50,36 @@ const OrganizationalUnitsTab: React.FC = () => {
   const [ous, setOUs] = useState<ADOrganizationalUnit[]>([]);
   const [ouTree, setOUTree] = useState<OUTreeNode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Loading organizational units...');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalOUs, setTotalOUs] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'tree'>('list');
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+  const [selectedOU, setSelectedOU] = useState<ADOrganizationalUnit | null>(null);
+  const [ouDetailOpen, setOUDetailOpen] = useState(false);
 
-  useEffect(() => {
-    fetchOUs();
-  }, [page, rowsPerPage]);
-
-  const fetchOUs = async () => {
+  const fetchOUs = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadingMessage('Connecting to Active Directory server...');
       
       // Make sure page is a valid number (1-based for API)
       const currentPage = Math.max(page + 1, 1);
+      
+      // Get server and domain info
+      const serverIP = activeDirectoryService.getServerIP();
+      const domain = localStorage.getItem('ad_domain_name');
+      
+      if (!serverIP || !domain) {
+        setLoadingMessage('Server connection information not found');
+        setOUs([]);
+        setTotalOUs(0);
+        return;
+      }
+      
+      setLoadingMessage(`Fetching organizational units from ${domain} (${serverIP})...`);
       
       const response = await activeDirectoryService.getOrganizationalUnits(
         currentPage, 
@@ -80,10 +99,10 @@ const OrganizationalUnitsTab: React.FC = () => {
       setOUs(response.items);
       setTotalOUs(response.totalCount || 0);
       
-      // Build OU tree for tree view (simple version)
+      // Build OU tree for tree view
       buildOUTree(response.items);
       
-      loggingService.logInfo(`Loaded ${response.items.length} organizational units`);
+      loggingService.logInfo(`Loaded ${response.items.length} organizational units from AD server`);
     } catch (error) {
       console.error('Error fetching OUs:', error);
       loggingService.logError(`Failed to load OUs: ${error instanceof Error ? error.message : String(error)}`);
@@ -94,7 +113,11 @@ const OrganizationalUnitsTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, rowsPerPage, searchQuery]);
+
+  useEffect(() => {
+    fetchOUs();
+  }, [fetchOUs]);
 
   // Build a simple OU tree from flat OU list
   const buildOUTree = (ouList: ADOrganizationalUnit[]) => {
@@ -170,11 +193,105 @@ const OrganizationalUnitsTab: React.FC = () => {
     setViewMode(mode);
   };
 
+  const handleViewDetails = (ou: ADOrganizationalUnit) => {
+    setSelectedOU(ou);
+    setOUDetailOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setOUDetailOpen(false);
+  };
+
   const toggleNodeExpanded = (nodeId: string) => {
     setExpandedNodes(prev => ({
       ...prev,
       [nodeId]: !prev[nodeId]
     }));
+  };
+
+  // Test function to directly call the API
+  const testDirectApiCall = async () => {
+    try {
+      setLoading(true);
+      setLoadingMessage('Testing direct API call...');
+      
+      const url = 'http://192.168.1.5:4444/api/v1/ad/object/ous';
+      const serverIP = '192.168.1.8';
+      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
+      
+      const body = {
+        address: `ldap://${serverIP}:389`,
+        domain_name: domain
+      };
+      
+      console.log('Direct test - Sending request to:', url);
+      console.log('Direct test - Request body:', JSON.stringify(body));
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      
+      console.log('Direct test - Response status:', response.status);
+      
+      const data = await response.json();
+      console.log('Direct test - Response data:', data);
+      
+      // Handle response based on whether it has 'ous' or 'docs' property (handling both formats)
+      const ousData = data.ous || data.docs || [];
+      
+      if (ousData && ousData.length > 0) {
+        // Create ADOrganizationalUnit objects from the response
+        const formattedOUs = ousData.map((ou: any) => ({
+          id: ou.objectGUID || ou.distinguishedName,
+          distinguishedName: ou.distinguishedName,
+          name: ou.name || (ou.distinguishedName.split(',')[0] || '').replace('OU=', ''),
+          path: ou.distinguishedName,
+          description: ou.description || '',
+          parentOU: extractParentOUFromDN(ou.distinguishedName),
+          protected: ou.protected || false,
+          managedBy: ou.managedBy || '',
+          created: ou.whenCreated ? new Date(ou.whenCreated) : undefined,
+          modified: ou.whenChanged ? new Date(ou.whenChanged) : undefined
+        }));
+        
+        setOUs(formattedOUs);
+        setTotalOUs(formattedOUs.length);
+        buildOUTree(formattedOUs);
+      }
+    } catch (error) {
+      console.error('Direct API test failed:', error);
+      alert('Direct API test failed: ' + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to extract parent OU from DN
+  const extractParentOUFromDN = (dn: string): string | undefined => {
+    const parts = dn.split(',');
+    if (parts.length <= 1) return undefined;
+    return parts.slice(1).join(',');
+  };
+
+  // Generate avatar background color based on OU name
+  const getAvatarColor = (name: string) => {
+    const colors = [
+      '#1976d2', '#388e3c', '#d32f2f', '#f57c00', '#7b1fa2',
+      '#0288d1', '#689f38', '#e64a19', '#fbc02d', '#512da8'
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // Format date to be more readable
+  const formatDate = (date: Date | undefined) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleString();
   };
 
   const renderTreeNode = (node: OUTreeNode, level: number = 0) => {
@@ -214,17 +331,21 @@ const OrganizationalUnitsTab: React.FC = () => {
   const renderTreeView = () => {
     if (loading) {
       return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-          <CircularProgress />
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+          <CircularProgress size={40} sx={{ mb: 2 }} />
+          <Typography variant="body1">{loadingMessage}</Typography>
         </Box>
       );
     }
 
     if (ouTree.length === 0) {
       return (
-        <Typography sx={{ p: 2 }}>
-          No organizational units found
-        </Typography>
+        <Box sx={{ py: 3, textAlign: 'center' }}>
+          <Typography variant="body1">No organizational units found</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Try adjusting your search criteria
+          </Typography>
+        </Box>
       );
     }
 
@@ -247,45 +368,79 @@ const OrganizationalUnitsTab: React.FC = () => {
                 <TableCell>Name</TableCell>
                 <TableCell>Path</TableCell>
                 <TableCell>Description</TableCell>
-                <TableCell>Protected</TableCell>
+                <TableCell>Created</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading && Array.from(new Array(5)).map((_, index) => (
-                <TableRow key={index}>
+              {loading && (
+                <TableRow>
                   <TableCell colSpan={5} align="center">
-                    <CircularProgress size={20} />
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+                      <CircularProgress size={40} sx={{ mb: 2 }} />
+                      <Typography variant="body1">{loadingMessage}</Typography>
+                    </Box>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
               
               {!loading && ous.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center">
-                    No organizational units found
+                    <Box sx={{ py: 3 }}>
+                      <Typography variant="body1">No organizational units found</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Try adjusting your search criteria
+                      </Typography>
+                    </Box>
                   </TableCell>
                 </TableRow>
               )}
               
               {!loading && ous.map((ou) => (
-                <TableRow key={ou.id}>
-                  <TableCell>{ou.name}</TableCell>
-                  <TableCell>{ou.path || ou.distinguishedName}</TableCell>
-                  <TableCell>{ou.description || 'N/A'}</TableCell>
+                <TableRow
+                  key={ou.id}
+                  hover
+                  onClick={() => handleViewDetails(ou)}
+                  sx={{ cursor: 'pointer' }}
+                >
                   <TableCell>
-                    <Chip 
-                      label={ou.protected ? "Protected" : "Not Protected"} 
-                      size="small" 
-                      color={ou.protected ? "warning" : "default"}
-                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Avatar
+                        sx={{
+                          mr: 2,
+                          backgroundColor: getAvatarColor(ou.name)
+                        }}
+                      >
+                        <Folder />
+                      </Avatar>
+                      <Typography variant="body1">{ou.name}</Typography>
+                    </Box>
                   </TableCell>
+                  <TableCell>{ou.path}</TableCell>
+                  <TableCell>{ou.description || 'N/A'}</TableCell>
+                  <TableCell>{ou.created ? formatDate(ou.created) : 'N/A'}</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex' }}>
+                      <Tooltip title="View Details">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDetails(ou);
+                          }}
+                        >
+                          <Info fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Edit">
                         <IconButton
                           size="small"
                           color="primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Edit logic
+                          }}
                         >
                           <Edit fontSize="small" />
                         </IconButton>
@@ -294,7 +449,10 @@ const OrganizationalUnitsTab: React.FC = () => {
                         <IconButton
                           size="small"
                           color="error"
-                          disabled={ou.protected}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Delete logic
+                          }}
                         >
                           <Delete fontSize="small" />
                         </IconButton>
@@ -339,7 +497,7 @@ const OrganizationalUnitsTab: React.FC = () => {
             component="div"
             sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}
           >
-            Organizational Units
+            Active Directory Organizational Units
             {loading && <CircularProgress size={24} sx={{ ml: 2 }} />}
             {!loading && (
               <Chip 
@@ -378,23 +536,40 @@ const OrganizationalUnitsTab: React.FC = () => {
               )
             }}
           />
-
-          <Tooltip title="Toggle View">
-            <Button 
-              variant="outlined"
+          
+          <Box sx={{ display: 'flex', mr: 2 }}>
+            <Button
+              variant={viewMode === 'list' ? 'contained' : 'outlined'}
               size="small"
-              onClick={() => handleViewModeChange(viewMode === 'list' ? 'tree' : 'list')}
+              onClick={() => handleViewModeChange('list')}
               sx={{ mr: 1 }}
             >
-              {viewMode === 'list' ? 'Tree View' : 'List View'}
+              List
             </Button>
-          </Tooltip>
+            <Button
+              variant={viewMode === 'tree' ? 'contained' : 'outlined'}
+              size="small"
+              onClick={() => handleViewModeChange('tree')}
+            >
+              Tree
+            </Button>
+          </Box>
 
           <Tooltip title="Refresh">
             <IconButton onClick={handleRefresh} disabled={loading}>
               <Refresh />
             </IconButton>
           </Tooltip>
+
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={testDirectApiCall}
+            size="small"
+            sx={{ ml: 1 }}
+          >
+            Test API
+          </Button>
 
           <Button
             variant="contained"
@@ -406,7 +581,91 @@ const OrganizationalUnitsTab: React.FC = () => {
         </Box>
       </Toolbar>
 
-      {viewMode === 'list' ? renderTableView() : renderTreeView()}
+      {viewMode === 'tree' ? renderTreeView() : renderTableView()}
+
+      {/* OU Details Dialog */}
+      <Dialog 
+        open={ouDetailOpen} 
+        onClose={handleCloseDetails}
+        maxWidth="md"
+        fullWidth
+      >
+        {selectedOU && (
+          <>
+            <DialogTitle>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Avatar 
+                  sx={{ 
+                    mr: 2, 
+                    width: 56, 
+                    height: 56,
+                    backgroundColor: getAvatarColor(selectedOU.name)
+                  }}
+                >
+                  <Folder />
+                </Avatar>
+                <Box>
+                  <Typography variant="h6">{selectedOU.name}</Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {selectedOU.distinguishedName}
+                  </Typography>
+                </Box>
+              </Box>
+            </DialogTitle>
+            <DialogContent dividers>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" gutterBottom>Organizational Unit Information</Typography>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableBody>
+                      <TableRow>
+                        <TableCell component="th" scope="row" sx={{ width: '30%' }}>Description</TableCell>
+                        <TableCell>{selectedOU.description || 'N/A'}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">Path</TableCell>
+                        <TableCell>{selectedOU.path}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">Parent OU</TableCell>
+                        <TableCell>{selectedOU.parentOU || 'Root'}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">Protected</TableCell>
+                        <TableCell>{selectedOU.protected ? 'Yes' : 'No'}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">Managed By</TableCell>
+                        <TableCell>{selectedOU.managedBy || 'N/A'}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">Created</TableCell>
+                        <TableCell>{selectedOU.created ? formatDate(selectedOU.created) : 'N/A'}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">Modified</TableCell>
+                        <TableCell>{selectedOU.modified ? formatDate(selectedOU.modified) : 'N/A'}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDetails}>Close</Button>
+              <Button 
+                color="primary" 
+                onClick={() => {
+                  // Edit logic
+                  handleCloseDetails();
+                }}
+              >
+                Edit OU
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
 };

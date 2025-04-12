@@ -562,7 +562,7 @@ export class ActiveDirectoryService {
       const url = 'http://192.168.1.5:4444/api/v1/ad/object/ous';
       const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
       const body = {
-        address: `ldap://192.168.1.8:389`,
+        address: `ldap://${serverIP}:389`,
         domain_name: domain
       };
 
@@ -586,12 +586,15 @@ export class ActiveDirectoryService {
       const data = await response.json();
       console.log('API response:', data);
       
-      if (data.status !== 'success') {
-        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
+      // Handle different API response formats
+      const ousData = data.ous || data.docs || [];
+      
+      if (!ousData || !Array.isArray(ousData)) {
+        throw new Error(`API responded with invalid OUs data: ${data.message || 'Unknown error'}`);
       }
 
       // Transform the API response to our ADOrganizationalUnit format
-      const ous: ADOrganizationalUnit[] = (data.ous || []).map((ou: any) => {
+      const ous: ADOrganizationalUnit[] = ousData.map((ou: any) => {
         return {
           id: ou.objectGUID || ou.distinguishedName,
           distinguishedName: ou.distinguishedName,
@@ -600,7 +603,9 @@ export class ActiveDirectoryService {
           description: ou.description || '',
           parentOU: this.extractParentOUFromDN(ou.distinguishedName),
           protected: ou.protected || false,
-          managedBy: ou.managedBy || ''
+          managedBy: ou.managedBy || '',
+          created: ou.whenCreated ? new Date(ou.whenCreated) : undefined,
+          modified: ou.whenChanged ? new Date(ou.whenChanged) : undefined
         };
       });
       
