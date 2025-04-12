@@ -454,7 +454,7 @@ export class ActiveDirectoryService {
       const url = 'http://192.168.1.5:4444/api/v1/ad/object/groups';
       const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
       const body = {
-        address: `ldap://192.168.1.8:389`,
+        address: `ldap://${serverIP}:389`,
         domain_name: domain
       };
 
@@ -478,23 +478,36 @@ export class ActiveDirectoryService {
       const data = await response.json();
       console.log('API response:', data);
       
-      if (data.status !== 'success') {
-        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
+      // Handle different API response formats
+      const groupsData = data.groups || data.docs || [];
+      
+      if (!groupsData || !Array.isArray(groupsData)) {
+        throw new Error(`API responded with invalid groups data: ${data.message || 'Unknown error'}`);
       }
 
       // Transform the API response to our ADGroup format
-      const groups: ADGroup[] = (data.groups || []).map((group: any) => {
+      const groups: ADGroup[] = groupsData.map((group: any) => {
+        // Extract members from the response - could be in 'members' or 'member' property
+        const memberArray = group.members || group.member || [];
+        // Convert members to string array if they're not already
+        const memberStrings = Array.isArray(memberArray) 
+          ? memberArray.map((m: any) => typeof m === 'string' ? m : m.distinguishedName || String(m))
+          : [];
+          
         return {
           id: group.objectGUID || group.distinguishedName,
-          distinguishedName: group.distinguishedName,
+          distinguishedName: group.distinguishedName || group.dn,
           name: group.name || group.samAccountName,
-          samAccountName: group.samAccountName,
+          samAccountName: group.samAccountName || group.name,
           description: group.description || '',
-          groupType: group.groupType || 'Security',
-          groupScope: group.groupScope || 'Global',
-          memberCount: group.members ? group.members.length : 0,
-          isSecurityGroup: group.isSecurityGroup !== false,
-          managedBy: group.managedBy || ''
+          groupType: group.groupCategory || (group.type && parseInt(group.type) < 0 ? 'Security' : 'Distribution'),
+          groupScope: group.scope || 'Global',
+          memberCount: memberStrings.length,
+          members: memberStrings,
+          isSecurityGroup: group.groupCategory === 'Security' || (group.type && parseInt(group.type) < 0),
+          managedBy: group.managedBy || '',
+          created: group.whenCreated ? new Date(group.whenCreated) : undefined,
+          modified: group.whenChanged ? new Date(group.whenChanged) : undefined
         };
       });
       
