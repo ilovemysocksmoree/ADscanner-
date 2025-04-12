@@ -9,6 +9,7 @@ import {
   ListItemText,
   Toolbar,
   Box,
+  Typography,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -20,6 +21,9 @@ import {
   History as LogsIcon,
   AdminPanelSettings as RoleManagementIcon,
   Shield as TrustIPIcon,
+  Storage as ADScannerIcon,
+  People as ADUsersIcon,
+  Folder as ADGroupsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link, useLocation } from 'react-router-dom';
@@ -61,6 +65,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     { title: 'Domain Users', path: '/admin/domain-users', icon: <UsersIcon />, adminOnly: true },
     { title: 'Role Management', path: '/admin/role-management', icon: <RoleManagementIcon />, adminOnly: true },
     { title: 'Admin Logs', path: '/admin/logs', icon: <LogsIcon />, adminOnly: true },
+  ];
+
+  const activeDirectoryItems: NavItem[] = [
+    { title: 'AD Scanner', path: '/active-directory/scanner', icon: <ADScannerIcon /> },
+    { title: 'AD Users', path: '/active-directory/users', icon: <ADUsersIcon /> },
+    { title: 'AD Groups', path: '/active-directory/groups', icon: <ADGroupsIcon /> },
   ];
 
   const drawer = (
@@ -105,6 +115,35 @@ const Sidebar: React.FC<SidebarProps> = ({
           </List>
         </>
       )}
+
+      <Divider />
+      <Typography
+        variant="subtitle1"
+        sx={{ 
+          px: 2,
+          py: 1,
+          fontWeight: 700,
+          color: 'primary.main'
+        }}
+      >
+        Active Directory
+      </Typography>
+      <List>
+        {activeDirectoryItems.map((item) => (
+          <ListItem key={item.path} disablePadding>
+            <ListItemButton
+              component={Link}
+              to={item.path}
+              selected={location.pathname === item.path}
+            >
+              <ListItemIcon>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.title} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
     </Box>
   );
 

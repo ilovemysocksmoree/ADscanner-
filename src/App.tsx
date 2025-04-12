@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import VulnerabilityScanner from './pages/VulnerabilityScanner';
 import NetworkScanner from './pages/NetworkScanner';
 import Reports from './pages/Reports';
+import ADScanner from './pages/ADScanner';
 import Login from './pages/Login';
 import Profile from './components/Profile';
 import ConfirmAccount from './pages/ConfirmAccount';
@@ -103,6 +104,38 @@ function App() {
               <ProtectedRoute>
                 <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
                   <Reports />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/ad-scanner" element={
+              <ProtectedRoute>
+                <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
+                  <ADScanner />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/active-directory/scanner" element={
+              <ProtectedRoute>
+                <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
+                  <ADScanner />
+                </Layout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/active-directory/users" element={
+              <ProtectedRoute>
+                <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
+                  <ADScanner />
+                </Layout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/active-directory/groups" element={
+              <ProtectedRoute>
+                <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
+                  <ADScanner />
                 </Layout>
               </ProtectedRoute>
             } />

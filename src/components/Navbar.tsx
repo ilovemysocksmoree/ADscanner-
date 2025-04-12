@@ -30,6 +30,8 @@ import {
   CloudUpload as UpdateIcon,
   AccountCircle as AccountIcon,
   ExitToApp as LogoutIcon,
+  Domain as ActiveDirectoryIcon,
+  Storage as ADScannerIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -72,6 +74,7 @@ export default function Navbar({ darkMode, onThemeChange }: NavbarProps) {
   const [alertHistory] = useState<AlertHistoryItem[]>(mockAlertHistory);
   const [autoScan, setAutoScan] = useState(true);
   const [realTimeUpdates, setRealTimeUpdates] = useState(true);
+  const [adMenuAnchor, setAdMenuAnchor] = useState<null | HTMLElement>(null);
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -116,6 +119,19 @@ export default function Navbar({ darkMode, onThemeChange }: NavbarProps) {
     }
   };
 
+  const handleADMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAdMenuAnchor(event.currentTarget);
+  };
+
+  const handleADMenuClose = () => {
+    setAdMenuAnchor(null);
+  };
+
+  const navigateToADScanner = () => {
+    handleADMenuClose();
+    navigate('/ad-scanner');
+  };
+
   return (
     <>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
@@ -123,6 +139,22 @@ export default function Navbar({ darkMode, onThemeChange }: NavbarProps) {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Security Dashboard
           </Typography>
+
+          {/* Active Directory Menu */}
+          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+            <IconButton
+              color="inherit"
+              onClick={handleADMenuOpen}
+              sx={{ 
+                borderRadius: 1,
+                px: 1,
+                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' }
+              }}
+            >
+              <ActiveDirectoryIcon sx={{ mr: 1 }} />
+              <Typography variant="body1">Active Directory</Typography>
+            </IconButton>
+          </Box>
 
           <IconButton color="inherit" onClick={() => setNotificationDrawer(true)}>
             <Badge badgeContent={alertHistory.length} color="error">
@@ -197,6 +229,28 @@ export default function Navbar({ darkMode, onThemeChange }: NavbarProps) {
             <LogoutIcon fontSize="small" />
           </ListItemIcon>
           Logout
+        </MenuItem>
+      </Menu>
+
+      {/* Active Directory Menu */}
+      <Menu
+        anchorEl={adMenuAnchor}
+        open={Boolean(adMenuAnchor)}
+        onClose={handleADMenuClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <MenuItem onClick={navigateToADScanner}>
+          <ListItemIcon>
+            <ADScannerIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>AD Scanner</ListItemText>
         </MenuItem>
       </Menu>
 

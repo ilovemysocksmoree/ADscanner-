@@ -22,6 +22,8 @@ import {
   Assessment as AssessmentIcon,
   AdminPanelSettings as RoleIcon,
   VerifiedUser as TrustIPIcon,
+  Storage as ADScannerIcon,
+  Domain as ActiveDirectoryIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -31,8 +33,14 @@ const commonNavigationItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/vulnerability-scanner', label: 'Vulnerability Scanner', icon: <SecurityIcon /> },
   { path: '/network-scanner', label: 'Network Scanner', icon: <NetworkIcon /> },
-  { path: '/trust-ip', label: 'TrustIP Analytics', icon: <TrustIPIcon /> },
   { path: '/reports', label: 'Reports', icon: <ReportIcon /> },
+  { path: '/trust-ip', label: 'TrustIP Analytics', icon: <TrustIPIcon /> },
+];
+
+const activeDirectoryItems = [
+  { path: '/active-directory/scanner', label: 'AD Scanner', icon: <ADScannerIcon /> },
+  { path: '/active-directory/users', label: 'AD Users', icon: <PeopleIcon /> },
+  { path: '/active-directory/groups', label: 'AD Groups', icon: <GroupIcon /> },
 ];
 
 const adminNavigationItems = [
@@ -48,6 +56,9 @@ export default function Sidebar() {
   const location = useLocation();
   const { user } = useAuth();
 
+  // Add a console log to debug if the user is admin
+  console.log('User is admin:', user?.isAdmin);
+  
   return (
     <Drawer
       variant="permanent"
@@ -68,6 +79,67 @@ export default function Sidebar() {
       <Box sx={{ overflow: 'auto' }}>
         <List sx={{ p: 0 }}>
           {commonNavigationItems.map((item) => (
+            <ListItem key={item.path} disablePadding>
+              <ListItemButton
+                selected={location.pathname === item.path}
+                onClick={() => navigate(item.path)}
+                sx={{
+                  minHeight: 48,
+                  px: 2.5,
+                  '&.Mui-selected': {
+                    backgroundColor: 'primary.dark',
+                    color: 'primary.contrastText',
+                    '&:hover': {
+                      backgroundColor: 'primary.dark',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: 'primary.contrastText',
+                    },
+                  },
+                  '&:hover': {
+                    backgroundColor: 'action.hover',
+                  },
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    minWidth: 40,
+                    color: location.pathname === item.path ? 'inherit' : 'primary.main',
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.label}
+                  sx={{
+                    '& .MuiTypography-root': {
+                      fontWeight: location.pathname === item.path ? 600 : 400,
+                    },
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+
+        {/* Active Directory Section - Now outside the admin check */}
+        <Divider sx={{ my: 2, borderColor: 'primary.main', borderWidth: 1 }} />
+        <Typography
+          variant="subtitle1"
+          sx={{ 
+            px: 3, 
+            py: 1, 
+            fontWeight: 700,
+            color: 'primary.main',
+            letterSpacing: '0.1px',
+            fontSize: '1rem',
+            textTransform: 'uppercase'
+          }}
+        >
+          Active Directory
+        </Typography>
+        <List sx={{ p: 0, mb: 2 }}>
+          {activeDirectoryItems.map((item) => (
             <ListItem key={item.path} disablePadding>
               <ListItemButton
                 selected={location.pathname === item.path}

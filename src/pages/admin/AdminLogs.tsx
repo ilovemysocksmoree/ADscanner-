@@ -29,6 +29,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { loggingService, LogEntry } from '../../services/LoggingService';
+import ADConnectionForm from '../../components/ADConnectionForm';
 
 const actionTypes = [
   // Authentication
@@ -341,6 +342,11 @@ export default function AdminLogs() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h6">AD Scanner</Typography>
+        <ADConnectionForm />
+      </Box>
     </Box>
   );
 } 

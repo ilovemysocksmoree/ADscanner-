@@ -13,6 +13,7 @@ export interface ReportData {
   target: string;
   findings: Array<{
     id: string;
+    type: 'vulnerability' | 'network' | 'performance' | 'security';
     severity: 'critical' | 'high' | 'medium' | 'low';
     title: string;
     description: string;
@@ -86,7 +87,11 @@ Scan Duration: ${dateFormat(new Date(data.scanInfo.startTime), 'PPpp')} to ${dat
     const summary = [
       ['Scan Date', dateFormat(new Date(data.date), 'PPpp')],
       ['Target', data.target],
-      ['Total Findings', data.summary.totalCount.toString()]
+      ['Total Findings', data.summary.totalCount.toString()],
+      ['Critical', data.summary.criticalCount.toString()],
+      ['High', data.summary.highCount.toString()],
+      ['Medium', data.summary.mediumCount.toString()],
+      ['Low', data.summary.lowCount.toString()]
     ];
     
     autoTable(doc, {
@@ -96,62 +101,57 @@ Scan Duration: ${dateFormat(new Date(data.scanInfo.startTime), 'PPpp')} to ${dat
       theme: 'grid',
     });
     
-    // Summary of Alerts
-    doc.addPage();
-    doc.setFontSize(16);
-    doc.text('Summary of Alerts', 20, 20);
-    
-    const alertSummary = [
-      ['Risk Level', 'Number of Alerts'],
-      ['High', '0'],
-      ['Medium', '3'],
-      ['Low', '4'],
-      ['Informational', '3']
-    ];
-    
-    autoTable(doc, {
-      startY: 30,
-      head: [['Risk Level', 'Number of Alerts']],
-      body: alertSummary,
-      theme: 'grid',
+    // Detailed Sections
+    const sections = {
+      'Vulnerabilities': data.findings.filter(f => f.type === 'vulnerability'),
+      'Network Issues': data.findings.filter(f => f.type === 'network'),
+      'Performance Metrics': data.findings.filter(f => f.type === 'performance'),
+      'Security Alerts': data.findings.filter(f => f.type === 'security')
+    };
+
+    Object.entries(sections).forEach(([sectionTitle, findings]) => {
+      if (findings.length > 0) {
+        doc.addPage();
+        doc.setFontSize(16);
+        doc.text(sectionTitle, 20, 20);
+        doc.setFontSize(12);
+
+        const sectionDetails = findings.map(finding => [
+          finding.title,
+          finding.severity,
+          finding.description,
+          finding.solution,
+          finding.cvss?.toString() || 'N/A',
+          (finding.references || []).join(', ')
+        ]);
+
+        autoTable(doc, {
+          startY: 30,
+          head: [['Name', 'Risk Level', 'Description', 'Solution', 'CVSS', 'References']],
+          body: sectionDetails,
+          theme: 'grid',
+        });
+      }
     });
-    
-    // Detailed Alerts
-    doc.addPage();
-    doc.setFontSize(16);
-    doc.text('Alerts', 20, 20);
-    
-    const alertDetails = [
-      ['Name', 'Risk Level', 'Number of Instances'],
-      ['Content Security Policy (CSP) Header Not Set', 'Medium', '56'],
-      ['Cross-Domain Misconfiguration', 'Medium', '69'],
-      ['Hidden File Found', 'Medium', '4'],
-      ['Cross-Domain JavaScript Source File Inclusion', 'Low', '96'],
-      ['Server Leaks Version Information via "Server" HTTP Response Header Field', 'Low', '71'],
-      ['Strict-Transport-Security Header Not Set', 'Low', '71'],
-      ['Timestamp Disclosure - Unix', 'Low', '1'],
-      ['Information Disclosure - Suspicious Comments', 'Informational', '2'],
-      ['Modern Web Application', 'Informational', '49'],
-      ['Re-examine Cache-control Directives', 'Informational', '19']
-    ];
-    
-    autoTable(doc, {
-      startY: 30,
-      head: [['Name', 'Risk Level', 'Number of Instances']],
-      body: alertDetails,
-      theme: 'grid',
+
+    // Alert Detail Pages
+    data.findings.forEach((finding, index) => {
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.text(`Alert Detail: ${finding.title}`, 20, 20);
+      doc.setFontSize(12);
+      doc.text(`Severity: ${finding.severity}`, 20, 30);
+      doc.text('Description:', 20, 40);
+      doc.text(finding.description, 20, 50, { maxWidth: 170 });
+      doc.text('Solution:', 20, 90);
+      doc.text(finding.solution, 20, 100, { maxWidth: 170 });
+      if (finding.references && finding.references.length > 0) {
+        doc.text('References:', 20, 130);
+        finding.references.forEach((ref, refIndex) => {
+          doc.text(`${refIndex + 1}. ${ref}`, 20, 140 + refIndex * 10, { maxWidth: 170 });
+        });
+      }
     });
-    
-    // Alert Detail Example
-    doc.addPage();
-    doc.setFontSize(16);
-    doc.text('Alert Detail', 20, 20);
-    doc.setFontSize(12);
-    doc.text('Medium Content Security Policy (CSP) Header Not Set', 20, 30);
-    doc.text('Description:', 20, 40);
-    doc.text('Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attacks, including Cross Site Scripting (XSS) and data injection attacks. These attacks are used for everything from data theft to site defacement or distribution of malware. CSP provides a set of standard HTTP headers that allow website owners to declare approved sources of content that browsers should be allowed to load on that page — covered types are JavaScript, CSS, HTML frames, fonts, images and embeddable objects such as Java applets, ActiveX, audio and video files.', 20, 50, { maxWidth: 170 });
-    doc.text('URL: https://app8.amazingvault.link/', 20, 90);
-    doc.text('Method: GET', 20, 100);
     
     return doc.output('blob');
   }
