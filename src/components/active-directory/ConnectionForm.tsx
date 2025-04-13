@@ -117,8 +117,19 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
       // Log the connection attempt
       loggingService.logInfo(`Testing connection to AD server: ${serverIP}`);
       
-      // Simulate step-by-step progress
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Extract the IP for better logging
+      const ip = serverIP.startsWith('ldap://') ? 
+        serverIP.substring(7).split(':')[0] : 
+        serverIP;
+      
+      console.log("Testing connection to server:", ip);
+      
+      // Simulate step-by-step progress with actual verification
+      updateCheckStep('server', 'checking');
+      const isReachable = await activeDirectoryService.testServerReachable(serverIP);
+      if (!isReachable) {
+        throw new Error("Server is not reachable");
+      }
       updateCheckStep('server', 'success');
       
       updateCheckStep('network', 'checking');
@@ -137,8 +148,9 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
       
       // Use the service to check health
       const data = await activeDirectoryService.checkHealth(serverIP);
+      console.log("Health check response:", data);
       
-      if (data.status === 'success' && data.stats.healthy) {
+      if (data.status === 'success' && data.stats && data.stats.healthy) {
         updateCheckStep('health', 'success', 'Server is healthy and ready');
         setSuccess('Connection test successful! Server is healthy and ready.');
         loggingService.logInfo(`Connection successful to AD server: ${serverIP}`);
@@ -153,7 +165,10 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
       loggingService.logError(`Failed to connect to AD server: ${errorMessage}`);
       
       // Update the appropriate step to error state
-      if (errorMessage.includes('timeout')) {
+      if (errorMessage.includes('not reachable')) {
+        updateCheckStep('server', 'error', 'Server not reachable');
+        setError('Server is not reachable. Check if the server is running and accessible.');
+      } else if (errorMessage.includes('timeout')) {
         updateCheckStep('network', 'error', 'Connection timed out');
         setError('Connection timed out. Server may be unreachable or behind a firewall.');
       } else if (errorMessage.includes('CORS')) {
@@ -188,60 +203,42 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({ onConnect }) => {
     setSuccess(null);
 
     try {
-      // Test direct API access first
-      try {
-        const testUrl = 'http://192.168.1.5:4444/api/v1/ad/object/users';
-        const testBody = {
-          address: `ldap://${serverIP}:389`,
-          domain_name: domain
-        };
-        
-        console.log('Testing direct API access to:', testUrl);
-        console.log('Request body:', JSON.stringify(testBody));
-        
-        const testResponse = await fetch(testUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(testBody)
-        });
-        
-        console.log('API test response status:', testResponse.status);
-        
-        if (!testResponse.ok) {
-          const errorText = await testResponse.text();
-          console.error('API test error response:', errorText);
-          throw new Error(`API test failed with status ${testResponse.status}: ${errorText}`);
-        }
-        
-        const testData = await testResponse.json();
-        console.log('API test response data:', testData);
-        
-        if (testData && testData.users) {
-          console.log(`Direct API test success! Found ${testData.users.length} users.`);
-        } else {
-          console.warn('API responded but no users data found:', testData);
-        }
-      } catch (apiTestError) {
-        console.error('Direct API test failed:', apiTestError);
-        // We'll continue with the connection process anyway
-      }
-
-      // Use the service to connect
-      const data = await activeDirectoryService.connect(serverIP, domain, username, password);
+      // Extract the IP and port from the LDAP URL if needed
+      const ip = serverIP.startsWith('ldap://') ? 
+        serverIP.substring(7).split(':')[0] : 
+        serverIP;
       
-      if (data.status === 'success') {
-        setSuccess(`Successfully connected to Active Directory! ${data.message || ''}`);
+      const ldapAddress = serverIP.startsWith('ldap://') ? 
+        serverIP : 
+        `ldap://${serverIP}:389`;
+      
+      // Test API access by trying to authenticate directly
+      console.log('Attempting to connect to:', ip);
+      console.log('Using LDAP address:', ldapAddress);
+      
+      // Use the service to connect
+      const connectionResult = await activeDirectoryService.connect(
+        serverIP, 
+        username, 
+        password, 
+        domain
+      );
+      
+      if (connectionResult.success) {
+        setSuccess(`Successfully connected to Active Directory!`);
         loggingService.logInfo(`Connected to AD server: ${serverIP} with domain: ${domain}`);
         
         if (onConnect) {
           onConnect(serverIP, domain);
         }
       } else {
-        setError(`Connection failed: ${data.message || 'Unknown error'}`);
+        setError(`Connection failed: ${connectionResult.message || 'Unknown error'}`);
+        loggingService.logError(`Failed to connect to AD: ${connectionResult.message}`);
       }
     } catch (error: any) {
       const errorMessage = error?.message || String(error);
       setError(`Failed to connect to Active Directory: ${errorMessage}`);
+      loggingService.logError(`Connection error: ${errorMessage}`);
       console.error('Connection error:', error);
     } finally {
       setLoading(false);

@@ -34,11 +34,25 @@ class ActiveDirectoryService {
   }
   
   /**
+   * Extract server IP from string (handles both direct IP and LDAP URLs)
+   */
+  private extractServerIP(serverInput: string): string {
+    // If it's an LDAP URL, extract the host part
+    if (serverInput.startsWith('ldap://')) {
+      // Extract host:port, then just the host
+      const urlParts = serverInput.substring(7).split(':');
+      return urlParts[0]; // Return just the host part
+    }
+    return serverInput;
+  }
+  
+  /**
    * Test server reachable
    */
   async testServerReachable(serverIP: string): Promise<boolean> {
     try {
-      const response = await fetch(`http://${serverIP}/api/health`);
+      const ip = this.extractServerIP(serverIP);
+      const response = await fetch(`http://${ip}/api/health`);
       return response.ok;
     } catch (error) {
       console.error("Server connection test failed:", error);
@@ -51,11 +65,66 @@ class ActiveDirectoryService {
    */
   async checkHealth(serverIP: string) {
     try {
-      const response = await fetch(`http://${serverIP}/api/health`);
-      return await response.json();
+      const ip = this.extractServerIP(serverIP);
+      const ldapAddress = serverIP.startsWith('ldap://') ? serverIP : `ldap://${serverIP}:389`;
+      
+      // First try the standard health endpoint
+      let response;
+      try {
+        response = await fetch(`http://${ip}/api/health`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (e) {
+        console.log("Standard health check failed, trying alternative endpoint");
+        // If that fails, try connecting directly to the LDAP endpoint
+        response = await fetch(`http://${ip}/api/v1/ad/status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            address: ldapAddress,
+            domain_name: localStorage.getItem('ad_domain_name') || ''
+          })
+        });
+      }
+      
+      if (!response.ok) {
+        console.error("Health check failed with status:", response.status);
+        return { 
+          status: "error", 
+          message: `Server returned status ${response.status}`,
+          stats: { healthy: false }
+        };
+      }
+      
+      const data = await response.json();
+      console.log("Health check response:", data);
+      
+      // Handle different response formats
+      if (data.status === 'success' || data.healthy === true) {
+        return { 
+          status: "success", 
+          message: data.message || "Server is online",
+          stats: { healthy: true }
+        };
+      } else {
+        return { 
+          status: "error", 
+          message: data.message || "Server reported unhealthy status",
+          stats: { healthy: false }
+        };
+      }
     } catch (error) {
       console.error("Health check failed:", error);
-      return { status: "error", message: "Failed to connect to server" };
+      return { 
+        status: "error", 
+        message: error instanceof Error ? error.message : "Failed to connect to server", 
+        stats: { healthy: false }
+      };
     }
   }
 
@@ -64,23 +133,44 @@ class ActiveDirectoryService {
    */
   async connect(serverIP: string, username: string, password: string, domain: string) {
     try {
-      const response = await fetch(`http://${serverIP}/api/auth/login`, {
+      const ip = this.extractServerIP(serverIP);
+      const ldapAddress = serverIP.startsWith('ldap://') ? serverIP : `ldap://${serverIP}:389`;
+      
+      // First, try to authenticate via the actual LDAP server
+      const response = await fetch(`http://${ip}/api/v1/ad/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, domain })
+        body: JSON.stringify({ 
+          address: ldapAddress,
+          domain_name: domain,
+          username: username,
+          password: password
+        })
       });
       
-      if (!response.ok) throw new Error('Authentication failed');
-      
       const data = await response.json();
-      this.setServerIP(serverIP);
+      console.log("Authentication response:", data);
+      
+      if (!response.ok) {
+        return { 
+          success: false, 
+          message: data.message || `Authentication failed (${response.status})` 
+        };
+      }
+      
+      // Authentication successful
+      // Store connection information
+      this.setServerIP(serverIP); // Store the original input format
       this.setAuthToken(data.token || '');
       localStorage.setItem('ad_domain_name', domain);
       
       return { success: true, message: "Connected successfully" };
     } catch (error) {
       console.error("Connection failed:", error);
-      return { success: false, message: String(error) };
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : "Failed to connect to server" 
+      };
     }
   }
   
@@ -89,17 +179,21 @@ class ActiveDirectoryService {
    */
   async getOrganizationalUnits(page = 1, pageSize = 10, filter = ''): Promise<PaginatedResponse<ADOrganizationalUnit>> {
     try {
-      const serverIP = this.getServerIP();
-      if (!serverIP) throw new Error('Server IP not set');
+      const serverInput = this.getServerIP();
+      if (!serverInput) throw new Error('Server IP not set');
       
-      const response = await fetch(`http://${serverIP}/api/v1/ad/object/ous`, {
+      const ip = this.extractServerIP(serverInput);
+      // For the address field in the body, use the original format if it's an LDAP URL, otherwise construct it
+      const ldapAddress = serverInput.startsWith('ldap://') ? serverInput : `ldap://${serverInput}:389`;
+      
+      const response = await fetch(`http://${ip}/api/v1/ad/object/ous`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('ad_auth_token')}`
         },
         body: JSON.stringify({
-          address: `ldap://${serverIP}:389`,
+          address: ldapAddress,
           domain_name: localStorage.getItem('ad_domain_name'),
           filter: filter,
           page: page,
@@ -149,17 +243,20 @@ class ActiveDirectoryService {
    */
   async getOUByDN(distinguishedName: string): Promise<ADOrganizationalUnit | null> {
     try {
-      const serverIP = this.getServerIP();
-      if (!serverIP) throw new Error('Server IP not set');
+      const serverInput = this.getServerIP();
+      if (!serverInput) throw new Error('Server IP not set');
       
-      const response = await fetch(`http://${serverIP}/api/v1/ad/object/ou`, {
+      const ip = this.extractServerIP(serverInput);
+      const ldapAddress = serverInput.startsWith('ldap://') ? serverInput : `ldap://${serverInput}:389`;
+      
+      const response = await fetch(`http://${ip}/api/v1/ad/object/ou`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('ad_auth_token')}`
         },
         body: JSON.stringify({
-          address: `ldap://${serverIP}:389`,
+          address: ldapAddress,
           domain_name: localStorage.getItem('ad_domain_name'),
           dn: distinguishedName
         })
@@ -200,17 +297,20 @@ class ActiveDirectoryService {
     protected?: boolean;
   }): Promise<ADOrganizationalUnit> {
     try {
-      const serverIP = this.getServerIP();
-      if (!serverIP) throw new Error('Server IP not set');
+      const serverInput = this.getServerIP();
+      if (!serverInput) throw new Error('Server IP not set');
       
-      const response = await fetch(`http://${serverIP}/api/v1/ad/object/ou/add`, {
+      const ip = this.extractServerIP(serverInput);
+      const ldapAddress = serverInput.startsWith('ldap://') ? serverInput : `ldap://${serverInput}:389`;
+      
+      const response = await fetch(`http://${ip}/api/v1/ad/object/ou/add`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('ad_auth_token')}`
         },
         body: JSON.stringify({
-          address: `ldap://${serverIP}:389`,
+          address: ldapAddress,
           domain_name: localStorage.getItem('ad_domain_name'),
           ou: {
             name: ouData.name,
@@ -252,21 +352,24 @@ class ActiveDirectoryService {
     protected?: boolean;
   }): Promise<ADOrganizationalUnit> {
     try {
-      const serverIP = this.getServerIP();
-      if (!serverIP) throw new Error('Server IP not set');
+      const serverInput = this.getServerIP();
+      if (!serverInput) throw new Error('Server IP not set');
+      
+      const ip = this.extractServerIP(serverInput);
+      const ldapAddress = serverInput.startsWith('ldap://') ? serverInput : `ldap://${serverInput}:389`;
       
       // Get current OU data
       const currentOU = await this.getOUByDN(distinguishedName);
       if (!currentOU) throw new Error('OU not found');
       
-      const response = await fetch(`http://${serverIP}/api/v1/ad/object/ou/update`, {
+      const response = await fetch(`http://${ip}/api/v1/ad/object/ou/update`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('ad_auth_token')}`
         },
         body: JSON.stringify({
-          address: `ldap://${serverIP}:389`,
+          address: ldapAddress,
           domain_name: localStorage.getItem('ad_domain_name'),
           ou: {
             distinguishedName,
@@ -301,17 +404,20 @@ class ActiveDirectoryService {
    */
   async deleteOU(distinguishedName: string, recursive: boolean = false): Promise<boolean> {
     try {
-      const serverIP = this.getServerIP();
-      if (!serverIP) throw new Error('Server IP not set');
+      const serverInput = this.getServerIP();
+      if (!serverInput) throw new Error('Server IP not set');
       
-      const response = await fetch(`http://${serverIP}/api/v1/ad/object/ou/delete`, {
+      const ip = this.extractServerIP(serverInput);
+      const ldapAddress = serverInput.startsWith('ldap://') ? serverInput : `ldap://${serverInput}:389`;
+      
+      const response = await fetch(`http://${ip}/api/v1/ad/object/ou/delete`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('ad_auth_token')}`
         },
         body: JSON.stringify({
-          address: `ldap://${serverIP}:389`,
+          address: ldapAddress,
           domain_name: localStorage.getItem('ad_domain_name'),
           distinguishedName,
           recursive
