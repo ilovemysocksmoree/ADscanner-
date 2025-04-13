@@ -45,6 +45,7 @@ import {
 import { activeDirectoryService } from '../../../services/ActiveDirectoryService';
 import { loggingService } from '../../../services/LoggingService';
 import { ADOrganizationalUnit, OUTreeNode } from '../../../models/ad-entities';
+import { extractParentOUFromDN, getAvatarColor, formatDate, buildOUTree, formatOUData } from '../utils/ouUtils';
 
 const OrganizationalUnitsTab: React.FC = () => {
   const [ous, setOUs] = useState<ADOrganizationalUnit[]>([]);
@@ -100,7 +101,8 @@ const OrganizationalUnitsTab: React.FC = () => {
       setTotalOUs(response.totalCount || 0);
       
       // Build OU tree for tree view
-      buildOUTree(response.items);
+      const treeNodes = buildOUTree(response.items);
+      setOUTree(treeNodes);
       
       loggingService.logInfo(`Loaded ${response.items.length} organizational units from AD server`);
     } catch (error) {
@@ -118,48 +120,6 @@ const OrganizationalUnitsTab: React.FC = () => {
   useEffect(() => {
     fetchOUs();
   }, [fetchOUs]);
-
-  // Build a simple OU tree from flat OU list
-  const buildOUTree = (ouList: ADOrganizationalUnit[]) => {
-    // Create a map of parent -> children
-    const ouMap: Record<string, OUTreeNode> = {};
-    const rootNodes: OUTreeNode[] = [];
-    
-    // First pass: create all nodes
-    ouList.forEach(ou => {
-      const node: OUTreeNode = {
-        id: ou.id,
-        name: ou.name,
-        distinguishedName: ou.distinguishedName,
-        path: ou.path || ou.distinguishedName,
-        parentOU: ou.parentOU,
-        children: [],
-        level: 0,
-        expanded: true
-      };
-      
-      ouMap[ou.distinguishedName] = node;
-    });
-    
-    // Second pass: build the tree
-    Object.values(ouMap).forEach(node => {
-      if (node.parentOU && ouMap[node.parentOU]) {
-        // Has a parent in our list
-        const parent = ouMap[node.parentOU];
-        if (parent.children) {
-          parent.children.push(node);
-        } else {
-          parent.children = [node];
-        }
-        node.level = parent.level + 1;
-      } else {
-        // Root node
-        rootNodes.push(node);
-      }
-    });
-    
-    setOUTree(rootNodes);
-  };
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -242,23 +202,13 @@ const OrganizationalUnitsTab: React.FC = () => {
       const ousData = data.ous || data.docs || [];
       
       if (ousData && ousData.length > 0) {
-        // Create ADOrganizationalUnit objects from the response
-        const formattedOUs = ousData.map((ou: any) => ({
-          id: ou.objectGUID || ou.distinguishedName,
-          distinguishedName: ou.distinguishedName,
-          name: ou.name || (ou.distinguishedName.split(',')[0] || '').replace('OU=', ''),
-          path: ou.distinguishedName,
-          description: ou.description || '',
-          parentOU: extractParentOUFromDN(ou.distinguishedName),
-          protected: ou.protected || false,
-          managedBy: ou.managedBy || '',
-          created: ou.whenCreated ? new Date(ou.whenCreated) : undefined,
-          modified: ou.whenChanged ? new Date(ou.whenChanged) : undefined
-        }));
+        // Use utility function to format OU data
+        const formattedOUs = formatOUData(ousData);
         
         setOUs(formattedOUs);
         setTotalOUs(formattedOUs.length);
-        buildOUTree(formattedOUs);
+        const treeNodes = buildOUTree(formattedOUs);
+        setOUTree(treeNodes);
       }
     } catch (error) {
       console.error('Direct API test failed:', error);
@@ -266,32 +216,6 @@ const OrganizationalUnitsTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Helper function to extract parent OU from DN
-  const extractParentOUFromDN = (dn: string): string | undefined => {
-    const parts = dn.split(',');
-    if (parts.length <= 1) return undefined;
-    return parts.slice(1).join(',');
-  };
-
-  // Generate avatar background color based on OU name
-  const getAvatarColor = (name: string) => {
-    const colors = [
-      '#1976d2', '#388e3c', '#d32f2f', '#f57c00', '#7b1fa2',
-      '#0288d1', '#689f38', '#e64a19', '#fbc02d', '#512da8'
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
-
-  // Format date to be more readable
-  const formatDate = (date: Date | undefined) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleString();
   };
 
   const renderTreeNode = (node: OUTreeNode, level: number = 0) => {

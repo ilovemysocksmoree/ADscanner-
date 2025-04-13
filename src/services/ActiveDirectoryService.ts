@@ -7,8 +7,7 @@ import {
   ADComputer,
   ADOrganizationalUnit,
   ADDomainController,
-  PaginatedResponse,
-  ADOU
+  PaginatedResponse
 } from '../models/ad-entities';
 import { mockFetchAdUsers } from '../utils/mockAdApiService';
 
@@ -1260,10 +1259,8 @@ export class ActiveDirectoryService {
         userPrincipalName: user.userPrincipalName,
         firstName: user.givenName || '',
         lastName: user.sn || '',
-        displayName: user.displayName || user.cn || `${user.givenName || ''} ${user.sn || ''}`.trim(),
-        email: user.mail || user.email || user.userPrincipalName,
         displayName: user.displayName || user.name || `${user.givenName || ''} ${user.sn || ''}`.trim() || user.sAMAccountName,
-        email: user.mail || '',
+        email: user.mail || user.email || user.userPrincipalName,
         description: user.description || '',
         enabled: user.userAccountControl ? !(user.userAccountControl & 2) : true,
         locked: user.lockoutTime ? Number(user.lockoutTime) > 0 : false,
@@ -1794,7 +1791,7 @@ export class ActiveDirectoryService {
     name: string;
     description?: string;
     parentDN?: string;
-  }): Promise<ADOU> {
+  }): Promise<ADOrganizationalUnit> {
     try {
       const serverIP = this.getServerIP();
       if (!serverIP) {
@@ -1849,7 +1846,7 @@ export class ActiveDirectoryService {
 
       // Create the new OU object to return
       const distinguishedName = `OU=${ouData.name},${parentDN}`;
-      const newOU: ADOU = {
+      const newOU: ADOrganizationalUnit = {
         id: data.objectGUID || `ou-${Date.now()}`,
         distinguishedName: distinguishedName,
         name: ouData.name,
@@ -1869,7 +1866,7 @@ export class ActiveDirectoryService {
   // Update an existing Organizational Unit in Active Directory
   async updateOU(distinguishedName: string, ouData: {
     description?: string;
-  }): Promise<ADOU> {
+  }): Promise<ADOrganizationalUnit> {
     try {
       const serverIP = this.getServerIP();
       if (!serverIP) {
@@ -1991,7 +1988,7 @@ export class ActiveDirectoryService {
   }
 
   // Get Organizational Unit by Distinguished Name
-  async getOUByDN(distinguishedName: string): Promise<ADOU | null> {
+  async getOUByDN(distinguishedName: string): Promise<ADOrganizationalUnit | null> {
     try {
       const serverIP = this.getServerIP();
       if (!serverIP) {
@@ -2039,14 +2036,15 @@ export class ActiveDirectoryService {
       // The first result should be our OU
       const ou = ousData[0];
       
-      // Transform to our ADOU format
+      // Transform to our ADOrganizationalUnit format
       return {
         id: ou.objectGUID || ou.distinguishedName,
         distinguishedName: ou.distinguishedName,
-        name: ou.ou || ou.name || this.extractNameFromDN(ou.distinguishedName),
+        name: ou.ou || ou.name || ou.distinguishedName.split(',')[0].replace('OU=', ''),
         description: ou.description || '',
         created: ou.whenCreated ? new Date(ou.whenCreated) : new Date(),
-        modified: ou.whenChanged ? new Date(ou.whenChanged) : new Date()
+        modified: ou.whenChanged ? new Date(ou.whenChanged) : new Date(),
+        children: [] // We'd need to load children separately
       };
     } catch (error) {
       console.error('Error getting OU by DN:', error);
@@ -2137,9 +2135,9 @@ export class ActiveDirectoryService {
         operatingSystemVersion: computerData.operatingSystemVersion || '',
         created: new Date(),
         modified: new Date(),
-        ...computerData,
         sAMAccountName: samAccountName, // Ensure the returned object has the correct sAMAccountName
-        cn: computerName // Ensure the returned object has the correct cn
+        cn: computerName, // Ensure the returned object has the correct cn
+        ...computerData
       };
     } catch (error) {
       console.error('Error adding computer:', error);
@@ -2327,279 +2325,6 @@ export class ActiveDirectoryService {
     } catch (error) {
       console.error('Error getting computer by DN:', error);
       loggingService.logError(`Failed to get computer by DN: ${error instanceof Error ? error.message : String(error)}`);
-      return null;
-    }
-  }
-
-  // Add a new Organizational Unit to Active Directory
-  async addOU(ouData: {
-    name: string;
-    description?: string;
-    parentDN?: string;
-  }): Promise<ADOU> {
-    try {
-      const serverIP = this.getServerIP();
-      if (!serverIP) {
-        throw new Error('Server IP not set');
-      }
-
-      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
-      loggingService.logInfo(`Adding new OU ${ouData.name} to ${domain}`);
-
-      // Check required fields
-      if (!ouData.name) {
-        throw new Error('Missing required OU name');
-      }
-
-      // Prepare the request
-      const url = 'http://192.168.1.5:4444/api/v1/ad/object/ou/add';
-      const parentDN = ouData.parentDN || `DC=${domain.replace(/\./g, ',DC=')}`;
-      
-      // Build the request body
-      const body = {
-        address: `ldap://${serverIP}:389`,
-        domain_name: domain,
-        ou: {
-          name: ouData.name,
-          description: ouData.description || '',
-          parentDN: parentDN
-        }
-      };
-
-      console.log('Adding OU, request:', body);
-
-      // Make the API call
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {})
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      const data = await response.json();
-      console.log('Add OU response:', data);
-      
-      if (data.status !== 'success') {
-        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
-      }
-
-      // Create the new OU object to return
-      const distinguishedName = `OU=${ouData.name},${parentDN}`;
-      const newOU: ADOU = {
-        id: data.objectGUID || `ou-${Date.now()}`,
-        distinguishedName: distinguishedName,
-        name: ouData.name,
-        description: ouData.description || '',
-        created: new Date(),
-        modified: new Date()
-      };
-
-      return newOU;
-    } catch (error) {
-      console.error('Error adding OU:', error);
-      loggingService.logError(`Failed to add OU: ${error instanceof Error ? error.message : String(error)}`);
-      throw error;
-    }
-  }
-
-  // Update an existing Organizational Unit in Active Directory
-  async updateOU(distinguishedName: string, ouData: {
-    description?: string;
-  }): Promise<ADOU> {
-    try {
-      const serverIP = this.getServerIP();
-      if (!serverIP) {
-        throw new Error('Server IP not set');
-      }
-
-      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
-      loggingService.logInfo(`Updating OU with DN ${distinguishedName} in ${domain}`);
-
-      // First, get the current OU data
-      const currentOU = await this.getOUByDN(distinguishedName);
-      if (!currentOU) {
-        throw new Error(`OU with DN ${distinguishedName} not found`);
-      }
-
-      // Prepare the request for attribute updates
-      const url = 'http://192.168.1.5:4444/api/v1/ad/object/ou/update';
-      
-      // Build the attributes to update
-      const attributes: any = {};
-      if (ouData.description !== undefined) attributes.description = ouData.description;
-      
-      // Build the request body
-      const body = {
-        address: `ldap://${serverIP}:389`,
-        domain_name: domain,
-        ou: {
-          distinguishedName: distinguishedName,
-          attributes: attributes
-        }
-      };
-
-      console.log('Updating OU, request:', body);
-
-      // Make the API call
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {})
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      const data = await response.json();
-      console.log('Update OU response:', data);
-      
-      if (data.status !== 'success') {
-        const data = await response.json();
-        console.log('Update OU attributes response:', data);
-        
-        if (data.status !== 'success') {
-          throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
-        }
-      }
-      
-      // Return the updated OU
-      return {
-        ...currentOU,
-        description: ouData.description !== undefined ? ouData.description : currentOU.description,
-        modified: new Date()
-      };
-    } catch (error) {
-      console.error('Error updating OU:', error);
-      loggingService.logError(`Failed to update OU: ${error instanceof Error ? error.message : String(error)}`);
-      throw error;
-    }
-  }
-
-  // Delete an Organizational Unit from Active Directory
-  async deleteOU(distinguishedName: string, recursive: boolean = false): Promise<boolean> {
-    try {
-      const serverIP = this.getServerIP();
-      if (!serverIP) {
-        throw new Error('Server IP not set');
-      }
-
-      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
-      loggingService.logInfo(`Deleting OU with DN ${distinguishedName} from ${domain} (recursive: ${recursive})`);
-
-      // Prepare the request
-      const url = 'http://192.168.1.5:4444/api/v1/ad/object/ou/delete';
-      
-      // Build the request body
-      const body = {
-        address: `ldap://${serverIP}:389`,
-        domain_name: domain,
-        distinguishedName: distinguishedName,
-        recursive: recursive
-      };
-
-      console.log('Deleting OU, request:', body);
-
-      // Make the API call
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {})
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      const data = await response.json();
-      console.log('Delete OU response:', data);
-      
-      if (data.status !== 'success') {
-        throw new Error(`API responded with error: ${data.message || 'Unknown error'}`);
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error deleting OU:', error);
-      loggingService.logError(`Failed to delete OU: ${error instanceof Error ? error.message : String(error)}`);
-      throw error;
-    }
-  }
-
-  // Get Organizational Unit by Distinguished Name
-  async getOUByDN(distinguishedName: string): Promise<ADOU | null> {
-    try {
-      const serverIP = this.getServerIP();
-      if (!serverIP) {
-        throw new Error('Server IP not set');
-      }
-
-      const domain = localStorage.getItem('ad_domain_name') || 'adscanner.local';
-      
-      // Prepare the request
-      const url = 'http://192.168.1.5:4444/api/v1/ad/object/ou';
-      
-      // Build the request body
-      const body = {
-        address: `ldap://${serverIP}:389`,
-        domain_name: domain,
-        dn: distinguishedName
-      };
-
-      console.log('Fetching OU by DN, request:', body);
-
-      // Make the API call
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {})
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      const data = await response.json();
-      console.log('Get OU response:', data);
-      
-      // Get OUs from either format
-      const ousData = data.ous || data.docs || [];
-      
-      if (!ousData || ousData.length === 0) {
-        return null;
-      }
-
-      // The first result should be our OU
-      const ou = ousData[0];
-      
-      // Transform to our ADOU format
-      return {
-        id: ou.objectGUID || ou.distinguishedName,
-        distinguishedName: ou.distinguishedName,
-        name: ou.ou || ou.name || ou.distinguishedName.split(',')[0].replace('OU=', ''),
-        description: ou.description || '',
-        created: ou.whenCreated ? new Date(ou.whenCreated) : new Date(),
-        modified: ou.whenChanged ? new Date(ou.whenChanged) : new Date(),
-        children: [] // We'd need to load children separately
-      };
-    } catch (error) {
-      console.error('Error getting OU by DN:', error);
-      loggingService.logError(`Failed to get OU by DN: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
   }
