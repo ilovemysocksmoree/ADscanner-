@@ -2071,16 +2071,16 @@ export class ActiveDirectoryService {
       loggingService.logInfo(`Adding new computer to ${domain}`);
 
       // Check required fields
-      if (!computerData.sAMAccountName) {
-        throw new Error('Computer sAMAccountName is required');
+      if (!computerData.samAccountName) {
+        throw new Error('Computer samAccountName is required');
       }
       
-      // Ensure sAMAccountName ends with $
-      const samAccountName = computerData.sAMAccountName.endsWith('$') 
-        ? computerData.sAMAccountName 
-        : `${computerData.sAMAccountName}$`;
+      // Ensure samAccountName ends with $
+      const samAccountName = computerData.samAccountName.endsWith('$') 
+        ? computerData.samAccountName 
+        : `${computerData.samAccountName}$`;
         
-      const computerName = computerData.cn || computerData.sAMAccountName.replace(/\$$/, '');
+      const computerName = computerData.name || computerData.samAccountName.replace(/\$$/, '');
       
       // Prepare the request
       const url = 'http://192.168.1.5:4444/api/v1/ad/object/computers/add';
@@ -2090,7 +2090,7 @@ export class ActiveDirectoryService {
         samAccountName: samAccountName,
         name: computerName,
         description: computerData.description || '',
-        parentDN: computerData.parentDN || `DC=${domain.replace(/\./g, ',DC=')}`
+        parentDN: computerData.location ? `OU=${computerData.location},DC=${domain.replace(/\./g, ',DC=')}` : `DC=${domain.replace(/\./g, ',DC=')}`
       };
       
       // Build the full request body
@@ -2127,17 +2127,16 @@ export class ActiveDirectoryService {
       return {
         id: data.objectGUID || samAccountName,
         distinguishedName: `CN=${computerName},${computerObject.parentDN}`,
-        sAMAccountName: samAccountName,
-        cn: computerName,
-        dNSHostName: `${computerName}.${domain}`,
+        samAccountName: samAccountName,
+        name: computerName,
+        dnsHostName: `${computerName}.${domain}`,
         description: computerData.description || '',
         operatingSystem: computerData.operatingSystem || '',
         operatingSystemVersion: computerData.operatingSystemVersion || '',
         created: new Date(),
         modified: new Date(),
-        sAMAccountName: samAccountName, // Ensure the returned object has the correct sAMAccountName
-        cn: computerName, // Ensure the returned object has the correct cn
-        ...computerData
+        ...computerData,
+        trusted: true // Ensure the computer is marked as trusted
       };
     } catch (error) {
       console.error('Error adding computer:', error);
@@ -2327,6 +2326,27 @@ export class ActiveDirectoryService {
       loggingService.logError(`Failed to get computer by DN: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
+  }
+
+  // Helper method to map computer data to ADComputer format
+  private mapComputerDataToADComputer(computer: any): ADComputer {
+    return {
+      id: computer.objectGUID || computer.distinguishedName,
+      distinguishedName: computer.distinguishedName,
+      name: computer.cn || computer.name || computer.distinguishedName.split(',')[0].replace('CN=', ''),
+      samAccountName: computer.sAMAccountName || '',
+      dnsHostName: computer.dNSHostName || '',
+      operatingSystem: computer.operatingSystem || '',
+      operatingSystemVersion: computer.operatingSystemVersion || '',
+      enabled: computer.userAccountControl ? !(computer.userAccountControl & 2) : true,
+      description: computer.description || '',
+      lastLogon: computer.lastLogon ? this.windowsTimeToDate(computer.lastLogon) : undefined,
+      managedBy: computer.managedBy || '',
+      location: computer.location || '',
+      trusted: true, // Default to trusted
+      created: computer.whenCreated ? new Date(computer.whenCreated) : new Date(),
+      modified: computer.whenChanged ? new Date(computer.whenChanged) : new Date()
+    };
   }
 }
 
