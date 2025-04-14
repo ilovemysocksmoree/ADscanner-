@@ -124,37 +124,37 @@ const Sidebar: React.FC<SidebarProps> = ({
               </ListItem>
             ))}
           </List>
+          
+          <Divider />
+          <Typography
+            variant="subtitle1"
+            sx={{ 
+              px: 2,
+              py: 1,
+              fontWeight: 700,
+              color: 'primary.main'
+            }}
+          >
+            Active Directory
+          </Typography>
+          <List>
+            {activeDirectoryItems.map((item) => (
+              <ListItem key={item.path} disablePadding>
+                <ListItemButton
+                  component={Link}
+                  to={item.path}
+                  selected={location.pathname === item.path}
+                >
+                  <ListItemIcon>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText primary={item.title} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
         </>
       )}
-
-      <Divider />
-      <Typography
-        variant="subtitle1"
-        sx={{ 
-          px: 2,
-          py: 1,
-          fontWeight: 700,
-          color: 'primary.main'
-        }}
-      >
-        Active Directory
-      </Typography>
-      <List>
-        {activeDirectoryItems.map((item) => (
-          <ListItem key={item.path} disablePadding>
-            <ListItemButton
-              component={Link}
-              to={item.path}
-              selected={location.pathname === item.path}
-            >
-              <ListItemIcon>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.title} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
     </Box>
   );
 

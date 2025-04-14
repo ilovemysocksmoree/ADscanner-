@@ -59,7 +59,7 @@ class ActiveDirectoryService {
       return false;
     }
   }
-  
+
   /**
    * Check server health
    */
@@ -167,8 +167,8 @@ class ActiveDirectoryService {
       return { success: true, message: "Connected successfully" };
     } catch (error) {
       console.error("Connection failed:", error);
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: error instanceof Error ? error.message : "Failed to connect to server" 
       };
     }
@@ -188,7 +188,7 @@ class ActiveDirectoryService {
       
       const response = await fetch(`http://${ip}/api/v1/ad/object/ous`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('ad_auth_token')}`
         },
@@ -202,7 +202,7 @@ class ActiveDirectoryService {
       });
       
       if (!response.ok) throw new Error('Failed to fetch organizational units');
-      
+
       const data = await response.json();
       const ous = data.ous || data.docs || [];
       
@@ -237,7 +237,7 @@ class ActiveDirectoryService {
       };
     }
   }
-  
+
   /**
    * Get OU by distinguished name
    */
@@ -251,7 +251,7 @@ class ActiveDirectoryService {
       
       const response = await fetch(`http://${ip}/api/v1/ad/object/ou`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('ad_auth_token')}`
         },
@@ -263,19 +263,19 @@ class ActiveDirectoryService {
       });
       
       if (!response.ok) throw new Error('Failed to fetch OU');
-      
+
       const data = await response.json();
       const ous = data.ous || data.docs || [];
       
       if (ous.length === 0) return null;
-      
+
       const ou = ous[0];
-      return {
-        id: ou.objectGUID || ou.distinguishedName,
-        distinguishedName: ou.distinguishedName,
+        return {
+          id: ou.objectGUID || ou.distinguishedName,
+          distinguishedName: ou.distinguishedName,
         name: ou.name || ou.ou || '',
         description: ou.description || '',
-        path: ou.distinguishedName,
+          path: ou.distinguishedName,
         parentOU: this.extractParentOU(ou.distinguishedName),
         protected: ou.isProtected || false,
         created: ou.whenCreated ? new Date(ou.whenCreated) : undefined,
@@ -364,7 +364,7 @@ class ActiveDirectoryService {
       
       const response = await fetch(`http://${ip}/api/v1/ad/object/ou/update`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('ad_auth_token')}`
         },
@@ -380,7 +380,7 @@ class ActiveDirectoryService {
           }
         })
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to update OU');
@@ -412,7 +412,7 @@ class ActiveDirectoryService {
       
       const response = await fetch(`http://${ip}/api/v1/ad/object/ou/delete`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('ad_auth_token')}`
         },
@@ -423,7 +423,7 @@ class ActiveDirectoryService {
           recursive
         })
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to delete OU');

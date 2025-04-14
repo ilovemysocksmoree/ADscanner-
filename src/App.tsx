@@ -109,7 +109,7 @@ function App() {
             } />
             
             <Route path="/ad-scanner" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
                   <ADScanner />
                 </Layout>
@@ -117,7 +117,7 @@ function App() {
             } />
             
             <Route path="/active-directory/scanner" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
                   <ADScanner />
                 </Layout>
@@ -125,7 +125,7 @@ function App() {
             } />
 
             <Route path="/active-directory/users" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
                   <ADScanner />
                 </Layout>
@@ -133,7 +133,7 @@ function App() {
             } />
 
             <Route path="/active-directory/groups" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
                   <ADScanner />
                 </Layout>
