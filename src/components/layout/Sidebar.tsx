@@ -10,6 +10,7 @@ import {
   Toolbar,
   Box,
   Typography,
+  useTheme,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -51,6 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { user } = useAuth();
   const location = useLocation();
   const isAdmin = user?.isAdmin;
+  const theme = useTheme();
 
   const navigationItems: NavItem[] = [
     { title: 'Dashboard', path: '/', icon: <DashboardIcon /> },
@@ -103,7 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               px: 2,
               py: 1,
               fontWeight: 700,
-              color: 'primary.main'
+              color: 'secondary.main'
             }}
           >
             Admin Panel
@@ -132,7 +134,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               px: 2,
               py: 1,
               fontWeight: 700,
-              color: 'primary.main'
+              color: 'secondary.main'
             }}
           >
             Active Directory
@@ -169,6 +171,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         [`& .MuiDrawer-paper`]: {
           width: DRAWER_WIDTH,
           boxSizing: 'border-box',
+          borderRight: '1px solid',
+          borderColor: 'divider',
         },
       }}
     >

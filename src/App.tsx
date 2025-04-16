@@ -14,6 +14,7 @@ import Profile from './components/Profile';
 import ConfirmAccount from './pages/ConfirmAccount';
 import TrustIPAnalytics from './pages/TrustIPAnalytics';
 import ADScanner from './pages/active-directory/ADScanner';
+import CompanyThemeSettings from './pages/CompanyThemeSettings';
 
 // Admin pages
 import DomainGroups from './pages/admin/DomainGroups';
@@ -28,19 +29,30 @@ import ProtectedRoute from './components/layout/ProtectedRoute';
 
 // Other
 import { AuthProvider } from './contexts/AuthContext';
+import { CompanyThemeProvider, useCompanyTheme } from './contexts/CompanyThemeContext';
 import { createAppTheme } from './theme';
 
-function App() {
+const AppContent = () => {
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const savedMode = localStorage.getItem('darkMode');
     return savedMode ? JSON.parse(savedMode) : false;
   });
 
+  const { companyTheme } = useCompanyTheme();
+
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  const theme = useMemo(() => createAppTheme(darkMode), [darkMode]);
+  // Update document title when company name changes
+  useEffect(() => {
+    document.title = companyTheme.name;
+  }, [companyTheme.name]);
+
+  const theme = useMemo(() => 
+    createAppTheme(darkMode, companyTheme.primaryColor, companyTheme.secondaryColor), 
+    [darkMode, companyTheme.primaryColor, companyTheme.secondaryColor]
+  );
 
   const handleThemeChange = () => {
     setDarkMode(!darkMode);
@@ -147,6 +159,14 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
+
+            <Route path="/company-theme-settings" element={
+              <ProtectedRoute requireAdmin>
+                <Layout darkMode={darkMode} onThemeChange={handleThemeChange}>
+                  <CompanyThemeSettings />
+                </Layout>
+              </ProtectedRoute>
+            } />
             
             <Route path="/trust-ip" element={
               <ProtectedRoute>
@@ -211,6 +231,14 @@ function App() {
         </Router>
       </AuthProvider>
     </ThemeProvider>
+  );
+}
+
+function App() {
+  return (
+    <CompanyThemeProvider>
+      <AppContent />
+    </CompanyThemeProvider>
   );
 }
 
