@@ -16,11 +16,9 @@ import {
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
   Notifications as NotificationsIcon,
-  Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCompanyTheme } from '../../contexts/CompanyThemeContext';
 
 interface NavbarProps {
   darkMode: boolean;
@@ -30,7 +28,6 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ darkMode, onThemeChange, onMenuToggle }) => {
   const { user, logout } = useAuth();
-  const { companyTheme } = useCompanyTheme();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -72,7 +69,7 @@ const Navbar: React.FC<NavbarProps> = ({ darkMode, onThemeChange, onMenuToggle }
             flexGrow: 1,
           }}
         >
-          {companyTheme.companyName}
+          AD Scanner
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -83,19 +80,6 @@ const Navbar: React.FC<NavbarProps> = ({ darkMode, onThemeChange, onMenuToggle }
           <IconButton color="inherit" sx={{ mr: 1 }}>
             <NotificationsIcon />
           </IconButton>
-
-          {user?.isAdmin && (
-            <Tooltip title="Company Theme Settings">
-              <IconButton
-                component={Link}
-                to="/company-theme-settings"
-                color="inherit"
-                sx={{ mr: 1 }}
-              >
-                <SettingsIcon />
-              </IconButton>
-            </Tooltip>
-          )}
 
           <Tooltip title="Account settings">
             <IconButton

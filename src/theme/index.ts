@@ -1,13 +1,13 @@
 import { createTheme } from '@mui/material/styles';
 
-export const createAppTheme = (darkMode: boolean, primaryColor = '#2196f3', secondaryColor = '#f50057') => createTheme({
+export const createAppTheme = (darkMode: boolean) => createTheme({
   palette: {
     mode: darkMode ? 'dark' : 'light',
     primary: {
-      main: primaryColor,
+      main: '#2196f3',
     },
     secondary: {
-      main: secondaryColor,
+      main: '#f50057',
     },
     background: {
       default: darkMode ? '#0a1929' : '#f5f5f5',

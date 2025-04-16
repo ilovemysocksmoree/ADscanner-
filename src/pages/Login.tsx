@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -24,7 +24,7 @@ import {
   DarkMode,
   MenuBook,
 } from '@mui/icons-material';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useGoogleLogin } from '@react-oauth/google';
 
@@ -61,7 +61,8 @@ const DEFAULT_USER = {
 
 export default function Login({ darkMode, onThemeChange }: LoginProps) {
   const navigate = useNavigate();
-  const { login, signInWithGoogle, register } = useAuth();
+  const location = useLocation();
+  const { login, signInWithGoogle, register, isAuthenticated } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +75,27 @@ export default function Login({ darkMode, onThemeChange }: LoginProps) {
   });
 
   const theme = useTheme();
+  
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      redirectAfterLogin();
+    }
+  }, [isAuthenticated]);
+
+  // Function to redirect user after successful login
+  const redirectAfterLogin = () => {
+    // Check if there's a redirect path stored from a previous access attempt
+    const redirectPath = sessionStorage.getItem('redirectPath');
+    if (redirectPath) {
+      sessionStorage.removeItem('redirectPath'); // Clear the stored path
+      navigate(redirectPath);
+    } else {
+      // Get the intended destination from location state or default to dashboard
+      const from = location.state?.from?.pathname || '/';
+      navigate(from);
+    }
+  };
 
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
@@ -143,10 +165,10 @@ export default function Login({ darkMode, onThemeChange }: LoginProps) {
     try {
       if (isRegistering) {
         await register(formData);
-        navigate('/');
+        redirectAfterLogin();
       } else {
         await login(formData.email, formData.password);
-        navigate('/');
+        redirectAfterLogin();
       }
     } catch (err) {
       if (err instanceof Error) {
@@ -160,7 +182,7 @@ export default function Login({ darkMode, onThemeChange }: LoginProps) {
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
-      navigate('/');
+      redirectAfterLogin();
     } catch (err) {
       setError('Failed to sign in with Google');
     }
